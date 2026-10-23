@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>COSMIQ Piano — Web Prototype</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header id="toolbar">
+    <div class="group">
+      <label>Sound
+        <select id="soundSource">
+          <option value="synth">Built-in modelled piano</option>
+          <option value="sfz">Real samples (SFZ folder)</option>
+        </select>
+      </label>
+      <span id="sfzControls" hidden>
+        <button id="sfzPickBtn">Choose folder…</button>
+        <input type="file" id="sfzFolder" webkitdirectory multiple hidden>
+        <select id="sfzFile" title="SFZ instrument"></select>
+        <label>Layers
+          <select id="sfzLayers">
+            <option>2</option><option selected>4</option><option>8</option><option>16</option>
+          </select>
+        </label>
+        <label>Max length
+          <select id="sfzMaxSec">
+            <option value="4">4 s</option><option value="8" selected>8 s</option><option value="15">15 s</option>
+          </select>
+        </label>
+        <button id="sfzLoadBtn" disabled>Load</button>
+      </span>
+      <span id="soundStatus" class="status"></span>
+    </div>
+
+    <div class="group">
+      <label>Keys
+        <select id="keysVisible">
+          <option value="88">All 88</option>
+          <option value="61">61</option>
+          <option value="49">49</option>
+          <option value="37">37</option>
+          <option value="25">25</option>
+          <option value="real">Real size</option>
+        </select>
+      </label>
+      <label id="inchesRow">Panel
+        <select id="screenInches">
+          <option value="55">55"</option><option value="65">65"</option><option value="75">75"</option>
+          <option value="86">86"</option><option value="98">98"</option>
+        </select>
+      </label>
+      <label>Layout
+        <select id="layout">
+          <option value="single">Single</option>
+          <option value="dual">Dual (teacher + student)</option>
+        </select>
+      </label>
+      <label>Labels
+        <select id="labels">
+          <option value="off">Off</option>
+          <option value="c">C only</option>
+          <option value="all">All</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="group">
+      <label>Velocity
+        <select id="velocityMode">
+          <option value="fixed">Fixed</option>
+          <option value="position">Key position</option>
+          <option value="contact">Contact size</option>
+          <option value="pressure">Pressure</option>
+        </select>
+      </label>
+      <label>Level <input type="range" id="fixedVelocity" min="1" max="127"> <span id="velValue"></span></label>
+      <label><input type="checkbox" id="palmReject"> Palm rejection</label>
+    </div>
+
+    <div class="group">
+      <label>Reverb <input type="range" id="reverb" min="0" max="0.8" step="0.01"></label>
+      <label>Volume <input type="range" id="volume" min="0" max="1" step="0.01"></label>
+    </div>
+
+    <div class="group">
+      <label>Song <select id="songSelect"></select></label>
+      <button id="songPlayBtn">▶ Play song</button>
+      <button id="songLearnBtn">🎓 Learn</button>
+      <button id="songStopBtn" disabled>■ Stop song</button>
+    </div>
+
+    <div class="group">
+      <button id="recBtn">● Rec</button>
+      <button id="playBtn" disabled>▶ Play</button>
+      <button id="stopBtn" disabled>■ Stop</button>
+      <span id="recStatus" class="status"></span>
+    </div>
+
+    <div class="group">
+      <button id="midiBtn">Connect MIDI</button>
+      <span id="midiStatus" class="status"></span>
+      <button id="panicBtn" title="Stop all sound">All notes off</button>
+      <button id="fullscreenBtn">Fullscreen</button>
+    </div>
+
+    <div id="stats" class="status stats"></div>
+  </header>
+
+  <main id="stage">
+    <div id="songBanner" hidden>
+      <div class="song-title"></div>
+      <div class="song-lyrics"></div>
+      <div class="song-hint"></div>
+    </div>
+    <div id="kb2" class="kb-wrap" hidden></div>
+    <div id="kb1" class="kb-wrap"></div>
+  </main>
+
+  <footer id="pedalBar">
+    <button id="toggleToolbar">Hide controls</button>
+    <button id="sustainBtn">Sustain pedal</button>
+    <label><input type="checkbox" id="sustainLatch"> Latch</label>
+    <span class="hint">Computer keys: A–; play · Z/X octave · Space = pedal</span>
+  </footer>
+
+  <div id="startOverlay">
+    <div class="card">
+      <h1>COSMIQ Piano</h1>
+      <p>Web prototype — touch, sound and latency test for IFPD panels.</p>
+      <button id="startBtn">Tap to start</button>
+      <progress id="startProgress" max="1" value="0" hidden></progress>
+      <p id="startStatus" class="status"></p>
+    </div>
+  </div>
+
+  <script src="../games/shared/input-mode.js"></script>
+  <script src="js/audio/PianoEngine.js"></script>
+  <script src="js/audio/SynthBank.js"></script>
+  <script src="js/audio/SfzLoader.js"></script>
+  <script src="js/NoteRouter.js"></script>
+  <script src="js/Recorder.js"></script>
+  <script src="js/Songs.js"></script>
+  <script src="js/input/MidiInput.js"></script>
+  <script src="js/ui/KeyboardView.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

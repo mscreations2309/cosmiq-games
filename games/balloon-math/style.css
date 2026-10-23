@@ -1,0 +1,27 @@
+/* Balloon Pop Maths — page-specific styles (shared look lives in ../shared/ifpd.css). */
+.ifpd-stage { background: #7ec3ee; }
+
+/* Option-group start menu (IFPD.overlay only supports one row of buttons). */
+.mm-group { margin: 4px 0 20px; }
+.mm-group h3 { margin: 0 0 10px; font-size: 18px; letter-spacing: 2px; text-transform: uppercase; color: #a9a7a0; }
+.mm-opts { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.ifpd-card .mm-opt { min-width: 150px; min-height: 64px; font-size: 22px; padding: 10px 22px; }
+.ifpd-card .mm-opt.on {
+  background: linear-gradient(#3d8bfd, #2266cc);
+  border-color: #9cc6ff;
+  box-shadow: 0 0 0 3px rgba(120, 180, 255, 0.45), 0 2px 0 #0008;
+}
+.mm-best { margin: 0 0 18px; font-size: 20px; color: #f3d27a; min-height: 1.4em; }
+.ifpd-card .mm-start { min-width: 260px; font-size: 26px; }
+
+/* Short screens (e.g. 1280×720): keep the whole menu visible. */
+.ifpd-overlay .ifpd-card { max-height: calc(100% - 16px); overflow-y: auto; }
+@media (max-height: 820px) {
+  .ifpd-card { padding: 20px 36px; }
+  .ifpd-card h2 { font-size: 32px; margin-bottom: 6px; }
+  .ifpd-card p { font-size: 19px; margin-bottom: 12px; }
+  .mm-group { margin-bottom: 12px; }
+  .mm-group h3 { margin-bottom: 6px; }
+  .ifpd-card .mm-opt { min-height: 56px; }
+  .mm-best { margin-bottom: 10px; }
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">COSMIQ Games</string>
+    <string name="no_file_picker">No file picker app is installed on this device.</string>
+    <string name="download_saved">Saved to Downloads</string>
+    <string name="download_failed">Could not save the file</string>
+</resources>

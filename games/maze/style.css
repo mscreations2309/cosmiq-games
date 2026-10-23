@@ -1,0 +1,51 @@
+/* Maze Runner */
+.ifpd-stage { background: radial-gradient(ellipse at 50% 40%, #2c2622 0%, #15120f 75%); }
+
+.maze-hud {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 6px;
+  z-index: 4;
+  pointer-events: none;
+}
+.maze-hud > * { pointer-events: auto; }
+.maze-hud .who {
+  font-size: 26px;
+  font-weight: 700;
+  padding: 4px 16px;
+  border-radius: 10px;
+  color: #fff;
+  text-shadow: 0 1px 2px #000a;
+  white-space: nowrap;
+}
+.maze-hud .time {
+  font: 700 34px/1 "Consolas", "Roboto Mono", monospace;
+  padding: 8px 16px;
+  border-radius: 10px;
+  background: linear-gradient(#0c0d0e, #1c1e21);
+  border: 1px solid #000;
+  box-shadow: inset 0 2px 6px #000, 0 1px 0 #ffffff1a;
+  color: #7dff9a;
+  text-shadow: 0 0 8px #3dff7a88;
+  min-width: 150px;
+  text-align: center;
+}
+.maze-hud .info { font-size: 20px; color: #d8cfc0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.maze-hud .spacer { flex: 1; }
+.maze-hud .ifpd-btn { font-size: 20px; white-space: nowrap; }
+
+.maze-setup { min-width: min(760px, 92vw); }
+.maze-setup .row { margin: 0 0 22px; }
+.maze-setup .row > label { display: block; font-size: 20px; color: #bdb8ad; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.seg .ifpd-btn { min-height: 64px; min-width: 140px; font-size: 22px; }
+.seg .ifpd-btn.on { background: linear-gradient(#f2b53c, #c98a12); border-color: #a87108; color: #221500; }
+.maze-setup .best { font-size: 18px; color: #a9a397; margin-top: -8px; margin-bottom: 18px; min-height: 24px; }
+.maze-hud .short { display: none; }
+.maze-hud.narrow .info { display: none; }
+.maze-hud.narrow .long { display: none; }
+.maze-hud.narrow .short { display: inline; }
+.maze-hud.tiny .who { font-size: 20px; padding: 4px 10px; }
+.maze-hud.tiny .time { font-size: 26px; min-width: 110px; padding: 6px 10px; }

@@ -1,0 +1,5 @@
+MediaPipe Tasks Vision 1.1.1 (@mediapipe/tasks-vision) and the hand_landmarker model
+Copyright Google LLC. Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+
+Used by ../../camera-control.js for camera (hand-tracking) input.

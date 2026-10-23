@@ -1,0 +1,11 @@
+# Android build output and local machine settings
+android-app/.gradle/
+android-app/.kotlin/
+android-app/build/
+android-app/app/build/
+android-app/local.properties
+.idea/
+*.iml
+
+# Built app (share it as a GitHub release instead of committing it)
+*.apk

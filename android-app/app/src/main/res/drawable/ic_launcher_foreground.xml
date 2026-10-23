@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Game controller over piano keys, kept inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- piano keys -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M28,58h52v16a4,4 0,0 1,-4 4h-44a4,4 0,0 1,-4 -4z" />
+    <path android:fillColor="#FF283593" android:pathData="M40.5,58h1v20h-1zM53.5,58h1v20h-1zM66.5,58h1v20h-1z" />
+    <path android:fillColor="#FF14141A" android:pathData="M36,58h8v10h-8zM49,58h8v10h-8zM62,58h8v10h-8z" />
+
+    <!-- controller -->
+    <path android:fillColor="#FFF9C74F"
+        android:pathData="M40,30h28c8,0 13,6 14,14l1,6c0.6,4 -3.6,6.5 -6.6,4l-6.4,-5h-26l-6.4,5c-3,2.5 -7.2,0 -6.6,-4l1,-6c1,-8 6,-14 14,-14z" />
+    <path android:fillColor="#FF283593" android:pathData="M37,36h4v4h4v4h-4v4h-4v-4h-4v-4h4z" />
+    <path android:fillColor="#FFE5534B" android:pathData="M68,38m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0" />
+    <path android:fillColor="#FF36B37E" android:pathData="M74,44m-2.6,0a2.6,2.6 0,1 1,5.2 0a2.6,2.6 0,1 1,-5.2 0" />
+</vector>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>COSMIQ Games</title>
+  <link rel="stylesheet" href="shared/ifpd.css">
+  <style>
+    html, body { touch-action: pan-y; overflow: auto; }
+    body {
+      display: block;
+      background:
+        radial-gradient(ellipse at 50% -10%, #2d3a5c 0%, transparent 60%),
+        linear-gradient(#17171d, #0f0f13);
+      min-height: 100%;
+    }
+    .home-head {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 28px 48px 8px;
+    }
+    .home-head h1 { margin: 0; font-size: 44px; font-weight: 700; letter-spacing: 0.5px; }
+    .home-head p { margin: 4px 0 0; color: #a9a7b3; font-size: 20px; }
+    .home-head .ifpd-btn { margin-left: auto; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 28px;
+      padding: 24px 48px 48px;
+    }
+    .tile {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      min-height: 230px;
+      padding: 22px 24px;
+      border-radius: 22px;
+      color: #fff;
+      text-decoration: none;
+      overflow: hidden;
+      background: linear-gradient(160deg, var(--c1), var(--c2));
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
+      touch-action: manipulation;
+    }
+    .tile::after { /* glossy top light */
+      content: "";
+      position: absolute;
+      inset: 0 0 55% 0;
+      background: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+      pointer-events: none;
+    }
+    .tile:active { transform: scale(0.97); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
+    .tile .icon { font-size: 76px; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35)); }
+    .tile h2 { margin: 14px 0 4px; font-size: 30px; }
+    .tile p { margin: 0; font-size: 17px; opacity: 0.92; }
+    .tile .tags { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .tile .tags span {
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.28);
+      font-size: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <header class="home-head">
+    <div>
+      <h1>COSMIQ Classroom Games</h1>
+      <p>Tap a game to play. Many players can touch the screen at the same time.</p>
+    </div>
+    <button class="ifpd-btn" id="fs">⛶ Fullscreen</button>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <script src="shared/input-mode.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const GAMES = [
+        { slug: 'air-hockey', icon: '🏒', title: 'Air Hockey', text: 'Fast table hockey, first to 7 goals.', tags: ['2 players', 'vs Computer'], c: ['#e04f5f', '#8e1f2c'] },
+        { slug: 'pong', icon: '🏓', title: 'Table Tennis', text: 'Real table-tennis rules with spin.', tags: ['2 players', 'vs Computer'], c: ['#2f80ed', '#173f7a'] },
+        { slug: 'whack-a-mole', icon: '🔨', title: 'Whack-a-Mole', text: 'Bonk the moles, avoid the hedgehogs!', tags: ['1–2 players', 'Reflexes'], c: ['#6ab04c', '#2f5d1f'] },
+        { slug: 'fruit-slice', icon: '🍉', title: 'Fruit Slice', text: 'Swipe to slice fruit, dodge the bombs.', tags: ['1–2 players', 'Swipe'], c: ['#f0932b', '#a3460e'] },
+        { slug: 'balloon-math', icon: '🎈', title: 'Balloon Maths', text: 'Pop the balloon with the right answer.', tags: ['1–2 teams', 'Maths'], c: ['#00a8cc', '#005f73'] },
+        { slug: 'memory-match', icon: '🃏', title: 'Memory Match', text: 'Find all the matching pairs.', tags: ['1–4 players', 'Memory'], c: ['#9b59b6', '#4f2466'] },
+        { slug: 'tic-tac-toe', icon: '❌', title: 'Tic-Tac-Toe', text: 'Three in a row on paper.', tags: ['2 players', 'vs Computer'], c: ['#7f8c8d', '#3b4446'] },
+        { slug: 'connect-four', icon: '🔴', title: 'Connect Four', text: 'Drop discs, connect four to win.', tags: ['2 players', 'vs Computer'], c: ['#1e5aa8', '#0c2a55'] },
+        { slug: 'jigsaw', icon: '🧩', title: 'Jigsaw Puzzle', text: 'Solve together — or use your own photo.', tags: ['Team play', 'Puzzle'], c: ['#d35400', '#6e2c00'] },
+        { slug: 'quiz-buzzer', icon: '🛎️', title: 'Quiz Show', text: 'Game-show board with team buzzers.', tags: ['2–4 teams', 'Teacher led'], c: ['#283593', '#0d1442'] },
+        { slug: 'pictionary', icon: '🖍️', title: 'Draw & Guess', text: 'One draws, the class guesses.', tags: ['2–4 teams', 'Drawing'], c: ['#16a085', '#0b4f42'] },
+        { slug: 'maze', icon: '🌀', title: 'Maze Runner', text: 'Guide the steel ball through the maze.', tags: ['1–2 players', 'Puzzle'], c: ['#8e6e53', '#4a3624'] },
+        { href: '../web-prototype/index.html', icon: '🎹', title: 'Piano', text: 'Full 88-key piano with real sound.', tags: ['Music', 'Multi-touch'], c: ['#34495e', '#121b24'] },
+      ];
+
+      const grid = document.getElementById('grid');
+      for (const g of GAMES) {
+        const a = document.createElement('a');
+        a.className = 'tile';
+        a.href = g.href || g.slug + '/index.html';
+        a.style.setProperty('--c1', g.c[0]);
+        a.style.setProperty('--c2', g.c[1]);
+        a.innerHTML = '<div class="icon"></div><h2></h2><p></p><div class="tags"></div>';
+        a.querySelector('.icon').textContent = g.icon;
+        a.querySelector('h2').textContent = g.title;
+        a.querySelector('p').textContent = g.text;
+        const tags = a.querySelector('.tags');
+        for (const t of g.tags) {
+          const s = document.createElement('span');
+          s.textContent = t;
+          tags.append(s);
+        }
+        grid.append(a);
+      }
+
+      document.getElementById('fs').addEventListener('click', () => {
+        if (document.fullscreenElement) document.exitFullscreen();
+        else document.documentElement.requestFullscreen().catch(() => {});
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,3 @@
+/* Fruit Slice — page-specific tweaks (shared look lives in ../shared/ifpd.css). */
+.ifpd-stage { background: #2a1a0e; }
+.ifpd-card .ifpd-btn { min-width: 220px; }

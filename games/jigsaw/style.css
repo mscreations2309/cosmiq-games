@@ -1,0 +1,24 @@
+/* Jigsaw-only additions on top of shared/ifpd.css */
+.jig-pic-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px !important;
+}
+.jig-pic-btn canvas {
+  width: min(210px, 14vw);
+  height: auto;
+  aspect-ratio: 3 / 2;
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.jig-status {
+  font-size: 24px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.ifpd-btn.jig-on { background: linear-gradient(#3d8bfd, #2266cc); border-color: #1d5bb8; }
