@@ -2,7 +2,7 @@
 
 Touch and camera-controlled games and a full 88-key piano, built for classroom interactive flat panels (IFPD).
 
-**Play online:** https://<username>.github.io/cosmiq-games/
+**Play online:** https://mscreations2309.github.io/cosmiq-games/
 
 ## What's inside
 
