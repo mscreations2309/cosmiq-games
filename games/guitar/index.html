@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Guitar</title>
+  <link rel="stylesheet" href="../shared/ifpd.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="ifpd-stage">
+    <canvas id="game"></canvas>
+    <div id="banner">
+      <div class="b-title"></div>
+      <div class="b-lyrics"></div>
+      <div class="b-hint"></div>
+    </div>
+    <div id="pads"></div>
+    <button id="soundNotice" hidden>🔊 Tap here to turn on the sound</button>
+  </main>
+  <script src="../shared/input-mode.js"></script>
+  <script src="../shared/ifpd.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

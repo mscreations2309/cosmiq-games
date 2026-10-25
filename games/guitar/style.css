@@ -1,0 +1,72 @@
+#banner {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 16%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+  z-index: 2;
+}
+.b-title { color: #e9dcc6; font-size: 20px; letter-spacing: 0.5px; opacity: 0.85; }
+.b-lyrics { font-size: 40px; font-weight: 700; color: #fff; text-shadow: 0 2px 8px #000a; }
+.b-lyrics > span { display: inline-flex; flex-direction: column; align-items: center; margin: 0 10px; color: #b9a98f; }
+.b-lyrics span.sung { color: #f4ead8; }
+.b-lyrics span.now { color: #6fe39b; text-shadow: 0 0 16px #2ecc7199; }
+.b-lyrics .chord { font-size: 20px; color: #ffd27a; }
+.b-hint { min-height: 26px; font-size: 21px; color: #ffd27a; }
+
+#pads {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18%;
+  display: flex;
+  gap: 1.2%;
+  justify-content: center;
+  align-items: center;
+  padding: 0 2%;
+  z-index: 2;
+}
+.pad {
+  flex: 1 1 0;
+  max-width: 170px;
+  height: 78%;
+  border-radius: 18px;
+  border: 2px solid #00000066;
+  background: linear-gradient(#5a3a22, #3b2414);
+  box-shadow: 0 6px 0 #1d1008, 0 10px 18px #000a, inset 0 1px 0 #ffffff30;
+  color: #f6ead6;
+  font: 700 40px "Segoe UI", system-ui, sans-serif;
+  touch-action: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.pad small { font-size: 15px; font-weight: 600; opacity: 0.75; }
+.pad.active { background: linear-gradient(#d9a441, #a8701d); color: #2b1606; box-shadow: 0 3px 0 #6b440d, 0 6px 14px #000a; transform: translateY(3px); }
+.pad.target { outline: 4px solid #2ecc71; outline-offset: 3px; animation: padPulse 0.9s ease-in-out infinite alternate; }
+.pad.open { background: linear-gradient(#3b4048, #262a30); }
+@keyframes padPulse { from { outline-color: #2ecc71; } to { outline-color: #2ecc7144; } }
+
+#soundNotice {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  padding: 18px 34px;
+  border-radius: 16px;
+  border: 0;
+  background: #2266cc;
+  color: #fff;
+  font: 700 26px "Segoe UI", system-ui, sans-serif;
+  box-shadow: 0 10px 30px #000a;
+}

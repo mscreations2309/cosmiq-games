@@ -1,6 +1,6 @@
 # COSMIQ Classroom Games
 
-Touch and camera-controlled games and a full 88-key piano, built for classroom interactive flat panels (IFPD).
+Touch and camera-controlled games, a full 88-key piano and an acoustic guitar, built for classroom interactive flat panels (IFPD).
 
 **Play online:** https://mscreations2309.github.io/cosmiq-games/
 
@@ -9,6 +9,7 @@ Touch and camera-controlled games and a full 88-key piano, built for classroom i
 | Folder | Contents |
 |---|---|
 | `games/` | 12 games (Air Hockey, Table Tennis, Whack-a-Mole, Fruit Slice, Balloon Maths, Memory Match, Tic-Tac-Toe, Connect Four, Jigsaw, Quiz Show, Draw & Guess, Maze Runner) and the home page |
+| `games/guitar/` | Acoustic guitar: strum or tap notes, 9 chord pads, songs to play along with or learn (Twinkle Twinkle, Happy Birthday) |
 | `web-prototype/` | 88-key piano with built-in piano sound, songs to play or learn (Twinkle Twinkle Little Star and more), recording and MIDI |
 | `games/shared/` | Shared toolkit, the Touch / Camera chooser, and hand tracking (MediaPipe, bundled for offline use) |
 | `android-app/` | Android WebView app that bundles everything for offline use on the panel |
