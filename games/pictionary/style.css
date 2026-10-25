@@ -136,3 +136,23 @@
 .pc-swatch.on { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35); }
 .pc-setup .count { font-size: 17px; color: #a9a397; margin-top: 4px; }
 .pc-setup .ifpd-buttons { position: sticky; bottom: -24px; margin: 10px -32px -24px; padding: 14px 32px 18px; background: linear-gradient(rgba(32,32,38,0.9), #202026 40%); }
+
+/* ------------------------------------------------------------------ keyboard hints (keyboard mode only) */
+.pc-kbd { display: none; gap: 3px; margin-left: 8px; vertical-align: middle; }
+html[data-input-mode=keyboard] .pc-kbd { display: inline-flex; }
+.pc-kbd kbd {
+  display: inline-block; min-width: 1.5em; padding: 0 6px; border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.55); border-bottom-width: 3px; background: rgba(0, 0, 0, 0.35);
+  font: 800 16px/1.45 "Segoe UI", sans-serif; color: #fff; text-align: center; text-shadow: none;
+}
+.pc-pen .pc-kbd { position: absolute; left: -6px; top: 50%; transform: translateY(-50%); margin: 0; pointer-events: none; }
+.pc-pen .pc-kbd kbd { font-size: 13px; padding: 0 4px; }
+.pc-tools > .pc-kbd { margin: -2px 0 0; flex: none; }
+.pc-tool .pc-kbd { margin: 2px 0 0; }
+.pc-tool .pc-kbd kbd { font-size: 13px; }
+.pc-peek .pc-kbd { margin: 6px 0 0; font-size: 18px; align-items: center; justify-content: center; gap: 6px; }
+html[data-input-mode=keyboard] .pc-peek .pc-kbd { display: flex; }
+.pc-peek.show .pc-kbd { display: none; }
+.pc-guess.armed { outline: 4px solid #ffd27a; outline-offset: 4px; border-radius: 14px; }
+.pc-guess.armed .ifpd-btn { animation: pc-armed 0.6s ease-in-out infinite alternate; }
+@keyframes pc-armed { to { filter: brightness(1.3); } }

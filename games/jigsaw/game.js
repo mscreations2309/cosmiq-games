@@ -746,13 +746,14 @@
   const page = IFPD.setupPage({ title: 'Jigsaw Puzzle', onRestart: restart });
   const ghostBtn = document.createElement('button');
   ghostBtn.className = 'ifpd-btn';
-  ghostBtn.textContent = '👻 Ghost';
+  ghostBtn.innerHTML = '👻 Ghost <kbd class="kb-hint">G</kbd>';
   ghostBtn.title = 'Show a faint picture on the board';
-  ghostBtn.addEventListener('click', () => {
+  function toggleGhost() {
     S.ghost = !S.ghost;
     ghostBtn.classList.toggle('jig-on', S.ghost);
     sfx.play('click');
-  });
+  }
+  ghostBtn.addEventListener('click', toggleGhost);
   const statusEl = document.createElement('span');
   statusEl.className = 'jig-status';
   page.extra.append(statusEl, ghostBtn);
@@ -1021,6 +1022,7 @@
     scatter(S.pieces);
     sfx.play('whoosh');
     updateStatus(true);
+    syncKeys();
   }
 
   function restart() {
@@ -1033,6 +1035,7 @@
   function complete() {
     S.phase = 'done';
     S.doneT = 0;
+    syncKeys();
     const key = bestKey(S.picDef.id, S.n), t = Math.floor(S.time);
     const record = IFPD.best.submit(key, t, false);
     sfx.play('win');
@@ -1133,6 +1136,37 @@
   });
 
   // ===================================================================================
+  // Keyboard — a virtual finger (arrows + Space) drags pieces through the same pointer code above
+  // ===================================================================================
+  const KB = window.CosmiqInput && CosmiqInput.keys;
+  let kbState = '';
+  function syncKeys() {
+    if (!KB) return;
+    const playing = S.phase === 'play' && !IFPD.overlay.visible;
+    KB.cursor(playing);
+    const st = playing ? 'play' : 'menu';
+    if (st === kbState) return;
+    kbState = st;
+    if (playing) {
+      KB.help('Jigsaw', [['← ↑ → ↓', 'Move the hand (W A S D too)'], ['Shift', 'Hold to move slowly'],
+        ['Space', 'Hold to pick up & drag, let go to drop'], ['G', 'Ghost picture on / off']]);
+    } else {
+      KB.help('Jigsaw', [['← → ↑ ↓', 'Choose'], ['Enter', 'Select'], ['Tab', 'Next button']]);
+    }
+  }
+  if (KB) {
+    // overlays come and go inside the stage: the cursor is only on while solving
+    new MutationObserver(syncKeys).observe(page.stage, { childList: true });
+    CosmiqInput.onChange(() => { kbState = ''; syncKeys(); });
+    KB.on(e => {
+      if (e.type !== 'keydown' || e.code !== 'KeyG') return;
+      if (S.phase !== 'play' || IFPD.overlay.visible) return;
+      e.preventDefault();
+      if (!e.repeat) toggleGhost();
+    });
+  }
+
+  // ===================================================================================
   // Loop
   // ===================================================================================
   function update(dt) {
@@ -1190,6 +1224,7 @@
   IFPD.loop(update, render);
   layout();
   showPictureMenu();
+  syncKeys();
 
   // debug hook for automated tests
   window.__game = {

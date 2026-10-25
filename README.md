@@ -17,10 +17,11 @@ Touch and camera-controlled games, a full 88-key piano and an acoustic guitar, b
 
 ## Controls
 
-On launch, choose **Touch** or **Camera**.
+On launch, choose **Touch**, **Camera** or **Keyboard** (or press 1, 2 or 3).
 
 - **Touch:** play with your fingers.
 - **Camera:** hold up a hand, then pinch your thumb and index finger to tap, and keep pinching to drag.
+- **Keyboard:** every game has its own keys, listed on a "⌨ Keys" card (press **?** to show or hide it). Menus work with Tab, the arrow keys and Enter. Puzzle, slicing and drawing games use a keyboard cursor: move it with the arrow keys and hold **Space** to touch. A mouse or touchpad also works.
 
 Camera mode needs a secure page. That means this GitHub Pages site, the Android app, or `http://localhost`.
 

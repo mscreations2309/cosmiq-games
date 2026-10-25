@@ -31,8 +31,6 @@
   let ui = null, cursorCanvas = null, cursorCtx = null, previewCanvas = null, previewCtx = null, statusEl = null;
   let raf = 0, lastVideoTime = -1, lastLandmarks = [];
   let tracks = [];
-  let nextPointerId = 1001;
-  const byPointerId = new Map();
 
   // --- start / stop --------------------------------------------------------------------------
 
@@ -52,6 +50,7 @@
       await video.play();
 
       setStatus('Loading hand tracking…');
+      await loadScript(base + 'virtual-pointer.js', () => window.CosmiqPointer);
       await loadScript(base + 'vendor/mediapipe/vision_bundle.js', () => window.Vision);
       const fileset = await window.Vision.FilesetResolver.forVisionTasks(base + 'vendor/mediapipe/wasm');
       landmarker = await createLandmarker(fileset);
@@ -174,7 +173,7 @@
     return {
       pointerId: 0, color: COLORS.find(c => !used.has(c)) || COLORS[0],
       nx: 0, ny: 0, x: 0, y: 0, pinch: 1, down: false, pinchFrames: 0,
-      fx: oneEuro(), fy: oneEuro(), lastSeen: 0, target: null, capture: null,
+      fx: oneEuro(), fy: oneEuro(), lastSeen: 0,
     };
   }
 
@@ -192,85 +191,23 @@
     } else if (d.pinch > PINCH_UP) {
       liftTrack(t, false);
     } else {
-      send('pointermove', t, t.capture || t.target);
+      window.CosmiqPointer.move(t.pointerId, t.x, t.y);
     }
   }
 
-  // --- pointer event synthesis -----------------------------------------------------------------
+  // --- pointer events (shared with the keyboard cursor, see virtual-pointer.js) ----------------
 
   function pressTrack(t) {
     t.down = true;
-    t.pointerId = nextPointerId++;
-    byPointerId.set(t.pointerId, t);
-    t.target = hitTest(t.x, t.y);
-    t.capture = null;
-    if (t.target) send('pointerdown', t, t.target);
+    t.pointerId = window.CosmiqPointer.down(t.x, t.y);
   }
 
   function liftTrack(t, cancelled) {
     if (!t.down) return;
-    const target = t.capture || t.target;
     t.down = false;
     t.pinchFrames = 0;
-    if (target) {
-      send(cancelled ? 'pointercancel' : 'pointerup', t, target);
-      if (t.capture) send('lostpointercapture', t, t.capture);
-      if (!cancelled && t.target) {
-        const under = hitTest(t.x, t.y);
-        if (under && (t.target === under || t.target.contains(under))) {
-          t.target.dispatchEvent(new MouseEvent('click', {
-            bubbles: true, cancelable: true, composed: true, clientX: t.x, clientY: t.y, button: 0, view: window,
-          }));
-        }
-      }
-    }
-    byPointerId.delete(t.pointerId);
-    t.target = null;
-    t.capture = null;
+    window.CosmiqPointer.up(t.pointerId, cancelled);
   }
-
-  function send(type, t, target) {
-    if (!target || !target.isConnected) return;
-    const isDown = type === 'pointerdown' || type === 'pointermove';
-    const init = {
-      bubbles: type !== 'lostpointercapture',
-      cancelable: type !== 'lostpointercapture' && type !== 'pointercancel',
-      composed: true,
-      pointerId: t.pointerId,
-      pointerType: 'touch',
-      isPrimary: t === tracks.find(o => o.down),
-      clientX: t.x, clientY: t.y, screenX: t.x, screenY: t.y,
-      width: 24, height: 24,
-      pressure: isDown && t.down ? 0.5 : 0,
-      button: type === 'pointermove' ? -1 : 0,
-      buttons: isDown && t.down ? 1 : 0,
-      view: window,
-    };
-    target.dispatchEvent(new PointerEvent(type, init));
-  }
-
-  function hitTest(x, y) {
-    return document.elementFromPoint(x, y); // overlay is pointer-events: none
-  }
-
-  // Pages call setPointerCapture with our synthetic ids; emulate capture instead of throwing.
-  const proto = Element.prototype;
-  const realSet = proto.setPointerCapture, realRelease = proto.releasePointerCapture, realHas = proto.hasPointerCapture;
-  proto.setPointerCapture = function (id) {
-    const t = byPointerId.get(id);
-    if (t) { t.capture = this; return; }
-    return realSet.call(this, id);
-  };
-  proto.releasePointerCapture = function (id) {
-    const t = byPointerId.get(id);
-    if (t) { if (t.capture === this) t.capture = null; return; }
-    return realRelease.call(this, id);
-  };
-  proto.hasPointerCapture = function (id) {
-    const t = byPointerId.get(id);
-    if (t) return t.capture === this;
-    return realHas.call(this, id);
-  };
 
   // --- overlay: cursors + camera preview ---------------------------------------------------------
 

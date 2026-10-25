@@ -247,3 +247,21 @@ input, textarea { user-select: text; -webkit-user-select: text; font: inherit; }
   .qz-cols { grid-template-columns: 1fr; }
   .qz-ed-grid { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------------------------ keyboard */
+.qz-set-pick {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 0; margin: 0;
+  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; touch-action: manipulation;
+}
+.qz-kbd {
+  display: none; min-width: 1.5em; padding: 0 7px; margin-left: 10px; border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.55); border-bottom-width: 3px; background: rgba(0, 0, 0, 0.35);
+  font: 800 0.8em/1.45 "Segoe UI", sans-serif; text-align: center; vertical-align: middle; color: #fff; text-shadow: none;
+}
+html[data-input-mode=keyboard] .qz-kbd { display: inline-block; }
+.qz-buzzer .qz-kbd {
+  position: absolute; right: -4px; bottom: -4px; margin: 0; z-index: 2; pointer-events: none;
+  font-size: max(18px, calc(var(--bz, 150px) * 0.16)); background: #111a; border-color: #fffa;
+}
+.qz-tile.qz-kbsel { outline: 5px solid #ffd27a; outline-offset: 2px; z-index: 1; filter: brightness(1.2); box-shadow: 0 0 24px rgba(255, 210, 122, 0.8), inset 0 2px 0 rgba(255, 255, 255, 0.35); }
+.qz-tile.used.qz-kbsel { filter: none; }

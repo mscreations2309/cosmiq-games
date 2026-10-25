@@ -39,6 +39,7 @@
     return el;
   };
   const sfx = (n, o) => IFPD.sfx.play(n, o);
+  const kbd = (...keys) => h('span', { class: 'pc-kbd' }, keys.map(k => h('kbd', { text: k }))); // keyboard-mode hint
   const loadJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (_) { return d; } };
 
   // ---------------------------------------------------------------- settings & state
@@ -472,7 +473,7 @@
         title: COLOR_NAMES[G.board][i],
         style: { '--pc': c, '--pcl': IFPD.draw.shade(c, 0.45), '--pcd': IFPD.draw.shade(c, -0.4) },
         onclick: () => { G.tool = 'pen'; G.color = i; sfx('click'); buildTools(); },
-      }, h('span', { class: 'body' }), h('span', { class: 'band' }), h('span', { class: 'cap' }));
+      }, h('span', { class: 'body' }), h('span', { class: 'band' }), h('span', { class: 'cap' }), kbd(String(i + 1)));
       toolsEl.append(pen);
     });
     toolsEl.append(h('div', { class: 'sep' }));
@@ -481,10 +482,10 @@
       class: 'pc-size' + (G.size === i ? ' on' : ''), title: ['Thin', 'Medium', 'Thick'][i],
       onclick: () => { G.size = i; sfx('click'); buildTools(); },
     }, h('i', { style: { width: px + 'px', height: px + 'px' } }))));
-    toolsEl.append(sizes);
-    toolsEl.append(h('button', { class: 'pc-tool' + (G.tool === 'eraser' ? ' on' : ''), title: 'Eraser', onclick: () => { G.tool = 'eraser'; sfx('click'); buildTools(); } }, h('span', { class: 'pc-eraser' })));
-    toolsEl.append(h('button', { class: 'pc-tool', onclick: () => undo() }, h('big', { text: '↶' }), 'Undo'));
-    toolsEl.append(h('button', { class: 'pc-tool', onclick: () => { if (!G.strokes.length || G.strokes[G.strokes.length - 1].clear) return; clearBoard(true); sfx('whoosh'); } }, h('big', { text: '🧽' }), 'Clear'));
+    toolsEl.append(sizes, kbd('[', ']'));
+    toolsEl.append(h('button', { class: 'pc-tool' + (G.tool === 'eraser' ? ' on' : ''), title: 'Eraser', onclick: () => { G.tool = 'eraser'; sfx('click'); buildTools(); } }, h('span', { class: 'pc-eraser' }), kbd('E')));
+    toolsEl.append(h('button', { class: 'pc-tool', onclick: () => undo() }, h('big', { text: '↶' }), 'Undo', kbd('Z')));
+    toolsEl.append(h('button', { class: 'pc-tool', onclick: () => clearByUser() }, h('big', { text: '🧽' }), 'Clear', kbd('Del')));
     toolsEl.append(h('div', { class: 'sep' }));
     toolsEl.append(h('button', {
       class: 'pc-tool', title: 'Switch board',
@@ -494,6 +495,12 @@
         sfx('flip'); buildTools(); layoutDirty = true; dirty = true;
       },
     }, h('big', { text: G.board === 'white' ? '⬛' : '⬜' }), G.board === 'white' ? 'Chalk board' : 'White board'));
+  }
+
+  function clearByUser() {
+    if (!G.strokes.length || G.strokes[G.strokes.length - 1].clear) return;
+    clearBoard(true);
+    sfx('whoosh');
   }
 
   // ---------------------------------------------------------------- word deck
@@ -532,44 +539,48 @@
     void C;
 
     if (G.phase === 'ready' || G.phase === 'drawing') {
-      const peek = h('div', { class: 'pc-peek' }, 'Drawer: press & HOLD to see your word');
-      const show = e => {
-        if (IFPD.isPalm(e)) return;
-        e.preventDefault();
-        try { peek.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
+      const peek = h('div', { class: 'pc-peek' });
+      const cover = () => { peek.textContent = ''; peek.append(h('div', null, 'Drawer: press & HOLD to see your word', h('span', { class: 'pc-kbd' }, 'or hold ', h('kbd', { text: 'H' })))); };
+      cover();
+      const reveal = () => {
+        if (peek.classList.contains('show')) return;
         peek.classList.add('show');
         peek.textContent = '';
         peek.append(h('div', null, h('span', { class: 'cat', text: G.word.cat }), h('span', { class: 'w', text: G.word.w })));
         sfx('flip');
       };
+      const show = e => {
+        if (IFPD.isPalm(e)) return;
+        e.preventDefault();
+        try { peek.setPointerCapture(e.pointerId); } catch (_) { /* synthetic */ }
+        reveal();
+      };
       const hide = () => {
         if (!peek.classList.contains('show')) return;
         peek.classList.remove('show');
-        peek.textContent = 'Drawer: press & HOLD to see your word';
+        cover();
       };
+      ui.peekShow = reveal;
+      ui.peekHide = hide;
       peek.addEventListener('pointerdown', show);
       peek.addEventListener('pointerup', hide);
       peek.addEventListener('pointercancel', hide);
       peek.addEventListener('lostpointercapture', hide);
       panelEl.append(peek);
       ui.peek = peek;
+    } else {
+      ui.peek = ui.peekShow = ui.peekHide = null;
     }
     if (G.phase === 'ready') {
-      panelEl.append(h('button', {
-        class: 'ifpd-btn', disabled: G.skips <= 0, text: `⤼ Skip word (${G.skips} left)`,
-        onclick: () => {
-          if (G.skips <= 0 || G.phase !== 'ready') return;
-          G.skips--; G.word = nextWord(); sfx('whoosh'); buildPanel();
-          IFPD.toast('New word — hold the card to see it');
-        },
-      }));
-      panelEl.append(h('button', { class: 'ifpd-btn good big', text: '▶ Start drawing', onclick: () => startDrawing() }));
+      panelEl.append(h('button', { class: 'ifpd-btn', disabled: G.skips <= 0, onclick: () => skipWord() }, `⤼ Skip word (${G.skips} left)`, kbd('S')));
+      panelEl.append(h('button', { class: 'ifpd-btn good big', onclick: () => startDrawing() }, '▶ Start drawing', kbd('Enter')));
     }
     if (G.phase === 'drawing') {
-      const box = h('div', { class: 'pc-guess' }, h('div', { class: 'lbl', text: 'Guessed! by…' }));
-      G.teams.forEach((t, i) => box.append(h('button', { class: 'ifpd-btn', style: chipStyle(t), text: `✓ ${t.name}`, onclick: () => guessed(i) })));
-      box.append(h('button', { class: 'ifpd-btn', text: '⏹ Nobody — reveal word', onclick: () => endTurn(null, 'giveup') }));
+      const box = h('div', { class: 'pc-guess' + (kbs.guessArmed ? ' armed' : '') }, h('div', { class: 'lbl', text: 'Guessed! by…' }));
+      G.teams.forEach((t, i) => box.append(h('button', { class: 'ifpd-btn', style: chipStyle(t), onclick: () => guessed(i) }, `✓ ${t.name}`, kbd('G', String(i + 1)))));
+      box.append(h('button', { class: 'ifpd-btn', onclick: () => endTurn(null, 'giveup') }, '⏹ Nobody — reveal word', kbd('N')));
       panelEl.append(box);
+      ui.guessBox = box;
     }
     const scores = h('div', { class: 'pc-scores' });
     ui.scores = G.teams.map((t, i) => {
@@ -579,6 +590,13 @@
     });
     panelEl.append(scores);
     updateClock(true);
+    syncKeys();
+  }
+
+  function skipWord() {
+    if (G.skips <= 0 || G.phase !== 'ready') return;
+    G.skips--; G.word = nextWord(); sfx('whoosh'); buildPanel();
+    IFPD.toast('New word — hold the card to see it');
   }
 
   function updateClock(force) {
@@ -688,7 +706,7 @@
       h('h2', { text: guesser != null ? '🎉 Guessed it!' : reason === 'timeout' ? "⏰ Time's up!" : 'The word was…' }),
       h('div', { class: 'word', text: G.word.w }),
       h('p', { text: lines.join('\n') }),
-      h('button', { class: 'ifpd-btn primary', text: last ? '🏆 See the winner' : '▶ Next team', onclick: () => nextTurn() })),
+      h('button', { class: 'ifpd-btn primary', onclick: () => nextTurn() }, last ? '🏆 See the winner' : '▶ Next team', kbd('Enter'))),
       guesser != null ? G.teams[guesser].color : null);
     buildPanel();
     if (guesser != null) { bump(guesser); bump(di); }
@@ -749,7 +767,7 @@
 
   // ---------------------------------------------------------------- setup
   let setupEl = null;
-  function closeSetup() { if (setupEl) { setupEl.remove(); setupEl = null; } }
+  function closeSetup() { if (setupEl) { setupEl.remove(); setupEl = null; syncKeys(); } }
 
   function showSetup() {
     IFPD.overlay.hide();
@@ -829,14 +847,140 @@
     seg('Rounds (every team draws once per round)', 'rounds', [[1, '1'], [2, '2'], [3, '3'], [4, '4'], [5, '5']]);
     seg('Board', 'board', [['white', '⬜ Whiteboard'], ['chalk', '⬛ Chalkboard']]);
 
+    const startBtn = h('button', { class: 'ifpd-btn primary', text: '▶ Start game', onclick: () => {
+      settings.teams.forEach((t, i) => { t.name = (t.name || '').trim() || `Team ${i + 1}`; });
+      saveSettings(); sfx('tap'); startGame();
+    } });
     card.append(h('div', { class: 'ifpd-buttons' },
-      h('button', { class: 'ifpd-btn primary', text: '▶ Start game', onclick: () => {
-        settings.teams.forEach((t, i) => { t.name = (t.name || '').trim() || `Team ${i + 1}`; });
-        saveSettings(); sfx('tap'); startGame();
-      } }),
+      startBtn,
       G.phase !== 'setup' && G.phase !== 'end' ? h('button', { class: 'ifpd-btn plain', text: 'Back to game', onclick: () => { sfx('click'); closeSetup(); } }) : null));
     stage.append(o);
     setupEl = o;
+    focusStart();
+    syncKeys();
+  }
+  function focusStart() { // keyboard mode: the setup card opens on its Start button
+    if (!setupEl || !window.CosmiqInput || CosmiqInput.mode !== 'keyboard') return;
+    const b = setupEl.querySelector('.ifpd-buttons .primary');
+    if (b) b.focus({ preventScroll: true });
+  }
+
+  // ---------------------------------------------------------------- keyboard
+  // Teacher / drawer shortcuts. Drawing uses the shared keyboard cursor (arrows / W A S D move it,
+  // Space = pen down), so no shortcut here uses W A S D or Space while drawing.
+  const kbs = { guessArmed: false, guessTimer: 0, help: '' };
+  function menuOpen() { return !!setupEl || IFPD.overlay.visible; }
+
+  function syncKeys() {
+    if (!window.CosmiqInput) return;
+    const drawing = G.phase === 'drawing' && !menuOpen();
+    CosmiqInput.keys.cursor(drawing);
+    if (G.phase !== 'drawing') armGuess(false);
+    const n = G.teams.length;
+    const tools = [['1 – 7', 'Marker colour'], ['[ ]', 'Thinner / thicker'], ['E', 'Eraser on / off'], ['Z', 'Undo'], ['Delete', 'Clear the board']];
+    let id, rows;
+    if (menuOpen() || G.phase === 'setup' || G.phase === 'end') {
+      id = 'menu';
+      rows = [['Tab', 'Next button / box'], ['← → ↑ ↓', 'Move between buttons'], ['Enter', 'Press']];
+    } else if (G.phase === 'ready') {
+      id = 'ready';
+      rows = [['H', 'Hold to peek at the word'], ['S', `Skip word`], ['Enter', 'Start drawing']].concat(tools);
+    } else if (G.phase === 'drawing') {
+      id = 'drawing' + n;
+      rows = [['← ↑ → ↓', 'Move the pen (W A S D too)'], ['Space', 'Hold to draw'], ['Shift', 'Hold to move slowly']]
+        .concat(tools, [['H', 'Hold to peek at the word'], [`G 1-${n}`, 'Guessed by team 1 … ' + n], ['N', 'Nobody — reveal the word']]);
+    } else {
+      id = 'reveal';
+      rows = [['Enter', G.turn + 1 >= G.totalTurns ? 'See the winner' : 'Next team']];
+    }
+    if (id === kbs.help) return;
+    kbs.help = id;
+    CosmiqInput.keys.help('Draw & Guess', rows);
+  }
+
+  function armGuess(on) {
+    clearTimeout(kbs.guessTimer);
+    if (!on && kbs.guessArmed) { const t = document.querySelector('.ifpd-toast'); if (t) t.style.opacity = '0'; } // drop the question
+    kbs.guessArmed = on;
+    if (ui.guessBox) ui.guessBox.classList.toggle('armed', on);
+    if (on) {
+      kbs.guessTimer = setTimeout(() => armGuess(false), 4000);
+      IFPD.toast(`Guessed by which team? Press 1 – ${G.teams.length}`, 2500);
+      sfx('tap', { volume: 0.5 });
+    }
+  }
+
+  // Enter on a button the player tabbed to presses it; focus left behind by a mouse click doesn't count.
+  function keyForButton(e) {
+    const b = e.target && e.target.closest && e.target.closest('button, a[href]');
+    if (!b) return false;
+    if (b.matches(':focus-visible')) return true;
+    b.blur();
+    return false;
+  }
+
+  if (window.CosmiqInput) {
+    CosmiqInput.onChange(() => { kbs.help = ''; syncKeys(); focusStart(); });
+    new MutationObserver(syncKeys).observe(stage, { childList: true }); // overlays pause the drawing cursor
+    window.addEventListener('blur', () => { if (ui.peekHide) ui.peekHide(); });
+    CosmiqInput.keys.on(e => {
+      if (menuOpen()) return;
+      const ph = G.phase, k = e.code;
+      const turn = ph === 'ready' || ph === 'drawing';
+      if (k === 'KeyH') {
+        if (!turn || !ui.peekShow) return;
+        e.preventDefault();
+        if (e.type === 'keyup') ui.peekHide();
+        else if (!e.repeat) ui.peekShow();
+        return;
+      }
+      if (e.type !== 'keydown') return;
+      const digit = /^(Digit|Numpad)[1-9]$/.test(k) ? Number(k.slice(-1)) : 0;
+      if (e.key === 'Enter') {
+        if (keyForButton(e) || (ph !== 'ready' && ph !== 'reveal')) return;
+        e.preventDefault();
+        if (e.repeat) return;
+        if (ph === 'ready') startDrawing(); else nextTurn();
+        return;
+      }
+      if (!turn) return;
+      if (kbs.guessArmed && ph === 'drawing') {
+        if (digit || k === 'Escape' || k === 'KeyG') {
+          e.preventDefault();
+          armGuess(false);
+          if (digit && digit <= G.teams.length) guessed(digit - 1);
+          else if (digit) sfx('click', { volume: 0.5 });
+          return;
+        }
+      }
+      if (e.repeat && k !== 'BracketLeft' && k !== 'BracketRight' && k !== 'KeyZ') return;
+      if (digit && digit <= PALETTES[G.board].length) {
+        e.preventDefault();
+        G.tool = 'pen'; G.color = digit - 1; sfx('click'); buildTools();
+      } else if (k === 'BracketLeft' || k === 'BracketRight') {
+        e.preventDefault();
+        const size = util.clamp(G.size + (k === 'BracketRight' ? 1 : -1), 0, SIZES.length - 1);
+        if (size !== G.size) { G.size = size; sfx('click'); buildTools(); }
+      } else if (k === 'KeyE') {
+        e.preventDefault();
+        G.tool = G.tool === 'eraser' ? 'pen' : 'eraser'; sfx('click'); buildTools();
+      } else if (k === 'KeyZ') {
+        e.preventDefault();
+        undo();
+      } else if (k === 'Delete' || k === 'Backspace') {
+        e.preventDefault();
+        clearByUser();
+      } else if (k === 'KeyS' && ph === 'ready') {
+        e.preventDefault();
+        if (G.skips > 0) skipWord(); else { sfx('click', { volume: 0.5 }); IFPD.toast('No skips left'); }
+      } else if (k === 'KeyG' && ph === 'drawing') {
+        e.preventDefault();
+        armGuess(true);
+      } else if (k === 'KeyN' && ph === 'drawing') {
+        e.preventDefault();
+        endTurn(null, 'giveup');
+      }
+    });
   }
 
   // ---------------------------------------------------------------- boot

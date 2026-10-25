@@ -44,6 +44,7 @@
     return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${a})`;
   };
   const sfx = (n, o) => IFPD.sfx.play(n, o);
+  const kbd = k => h('kbd', { class: 'qz-kbd', text: k }); // key hint, shown in keyboard mode only
   function teamVars(color) {
     return {
       '--c': color, '--cl': IFPD.draw.shade(color, 0.55), '--cd': IFPD.draw.shade(color, -0.35), '--cdd': IFPD.draw.shade(color, -0.65),
@@ -119,13 +120,14 @@
     app.append(el);
     S.screen = name;
     setupBtn.hidden = name === 'setup';
+    if (name !== 'game') keyHelp();
   }
 
   // ---------------------------------------------------------------- setup screen
   function showSetup() {
     IFPD.overlay.hide();
     if (S.q && S.screen === 'game') saveProgress();
-    const scr = h('div', { class: 'qz-screen qz-scroll qz-setup' });
+    const scr = h('div', { class: 'qz-screen qz-scroll qz-setup', 'data-keyboard-menu': '' });
     const inner = h('div', { class: 'qz-setup-inner' });
     scr.append(inner);
     inner.append(h('div', { class: 'qz-logo' }, 'QUIZ SHOW', h('small', { text: 'Pick a tile · buzz in first · answer to score' })));
@@ -185,8 +187,9 @@
     const sets = h('div', { class: 'qz-sets' });
     for (const s of allSets()) {
       const card = h('div', { class: 'qz-set' + (s.id === S.setId ? ' on' : ''), onclick: () => { S.setId = s.id; store(LS.set, s.id); sfx('click'); sets.querySelectorAll('.qz-set').forEach(x => x.classList.toggle('on', x === card)); } },
-        h('div', { class: 'radio' }),
-        h('div', { class: 'meta' }, h('b', null, s.name, isBuiltin(s.id) ? null : h('span', { class: 'tag', text: 'custom' })), h('span', { text: s.categories.map(c => c.name).join(' · ') })),
+        h('button', { class: 'qz-set-pick', title: 'Use this set' }, // a real button so Tab / arrows / Enter reach it
+          h('div', { class: 'radio' }),
+          h('div', { class: 'meta' }, h('b', null, s.name, isBuiltin(s.id) ? null : h('span', { class: 'tag', text: 'custom' })), h('span', { text: s.categories.map(c => c.name).join(' · ') }))),
         h('button', { class: 'ifpd-btn', text: '✎ Edit', onclick: e => { e.stopPropagation(); sfx('click'); openEditor(s.id); } }));
       sets.append(card);
     }
@@ -198,8 +201,15 @@
     const right = h('div', { class: 'qz-right' }, setPanel);
     cols.append(right);
 
-    right.append(h('button', { class: 'ifpd-btn primary qz-start', text: prog ? '▶ Start NEW game' : '▶ Start game', onclick: () => { sfx('tap'); startGame(); } }));
+    const startBtn = h('button', { class: 'ifpd-btn primary qz-start', text: prog ? '▶ Start NEW game' : '▶ Start game', onclick: () => { sfx('tap'); startGame(); } });
+    right.append(startBtn);
     setScreen(scr, 'setup');
+    focusStart();
+  }
+  function focusStart() { // keyboard mode: the setup screen opens on its main button
+    if (!kbMode() || S.screen !== 'setup') return;
+    const b = app.querySelector('.qz-resume .good') || app.querySelector('.qz-start');
+    if (b) b.focus({ preventScroll: true });
   }
 
   // ---------------------------------------------------------------- game
@@ -243,7 +253,7 @@
     S.set.categories.forEach(c => board.append(h('div', { class: 'qz-cat', text: c.name })));
     for (let r = 0; r < 5; r++) {
       for (let c = 0; c < 5; c++) {
-        const t = h('button', { class: 'qz-tile', text: String(VALUES[r]), onclick: () => openTile(c, r) });
+        const t = h('button', { class: 'qz-tile', text: String(VALUES[r]), onclick: () => { if (!S.q) { kb.c = c; kb.r = r; } openTile(c, r); } });
         tiles[c * 5 + r] = t;
         board.append(t);
       }
@@ -251,7 +261,7 @@
     wrap.append(board);
     const strip = h('div', { class: 'qz-teams' });
     const teams = S.teams.map((t, i) => {
-      const buzzer = h('div', { class: 'qz-buzzer off' }, h('div', { class: 'base' }), h('div', { class: 'rim' }), h('div', { class: 'dome' }), h('span', { class: 'lbl', text: 'BUZZ' }));
+      const buzzer = h('div', { class: 'qz-buzzer off' }, h('div', { class: 'base' }), h('div', { class: 'rim' }), h('div', { class: 'dome' }), h('span', { class: 'lbl', text: 'BUZZ' }), kbd(String(i + 1)));
       const score = h('button', { class: 'qz-score', onclick: e => { e.stopPropagation(); openPopover(i); } });
       const state = h('div', { class: 'state' });
       const zone = h('div', { class: 'qz-team', style: teamVars(t.color) }, buzzer, h('div', { class: 'info' }, h('div', { class: 'name', text: t.name }), score, state));
@@ -272,6 +282,7 @@
     });
     scr.append(wrap, strip);
     ui = { scr, wrap, board, tiles, strip, teams, card: null };
+    kb.shown = kbMode();
     setScreen(scr, 'game');
     sizeBuzzers();
     refresh();
@@ -294,6 +305,7 @@
     if (!ui || S.screen !== 'game') return;
     const q = S.q;
     S.used.forEach((u, i) => ui.tiles[i].classList.toggle('used', u || (!!q && i === q.c * 5 + q.r)));
+    ui.tiles.forEach((t, i) => t.classList.toggle('qz-kbsel', kb.shown && !q && i === kb.c * 5 + kb.r));
     S.teams.forEach((t, i) => {
       const T = ui.teams[i];
       T.score.textContent = String(t.score);
@@ -309,6 +321,7 @@
       T.state.textContent = !q ? '' : answering ? '🎤 Answering…' : locked ? 'Locked out' : q.phase === 'open' ? 'Ready to buzz!' : '';
     });
     renderCard();
+    keyHelp();
   }
 
   // ---------------------------------------------------------------- question flow
@@ -387,15 +400,15 @@
     if (q.phase === 'open' || q.phase === 'opening') {
       const n = q.locked.length;
       status.append(n ? `✗ Wrong! ${S.teams.length - n} team${S.teams.length - n > 1 ? 's' : ''} can still buzz…` : '🔔 Buzz in to answer!');
-      ctl.append(h('button', { class: 'ifpd-btn', text: '👁 Reveal answer', onclick: () => reveal('skip') }));
+      ctl.append(h('button', { class: 'ifpd-btn', onclick: () => reveal('skip') }, '👁 Reveal answer', kbd('R')));
     } else if (q.phase === 'answering') {
       const t = S.teams[q.answering];
       card.style.setProperty('--qc', t.color);
       card.style.setProperty('--qg', rgba(t.color, 0.8));
       status.append(chip(q.answering), ' is answering!');
       ctl.append(
-        h('button', { class: 'ifpd-btn good', text: `✓ Correct  +${val}`, onclick: () => judge(true) }),
-        h('button', { class: 'ifpd-btn bad', text: `✗ Wrong  −${val}`, onclick: () => judge(false) }));
+        h('button', { class: 'ifpd-btn good', onclick: () => judge(true) }, `✓ Correct  +${val}`, kbd('C')),
+        h('button', { class: 'ifpd-btn bad', onclick: () => judge(false) }, `✗ Wrong  −${val}`, kbd('X')));
     } else if (q.phase === 'revealed') {
       const res = q.result || {};
       if (res.team != null) {
@@ -404,7 +417,7 @@
       } else if (res.reason === 'timeout') status.append('⏰ Time\'s up!');
       else if (res.reason === 'allwrong') status.append('Nobody got it this time.');
       else status.append('Answer revealed');
-      ctl.append(h('button', { class: 'ifpd-btn primary', text: '↩ Back to board', onclick: () => backToBoard() }));
+      ctl.append(h('button', { class: 'ifpd-btn primary', onclick: () => backToBoard() }, '↩ Back to board', kbd('B')));
     }
     ans.hidden = q.phase !== 'revealed';
     if (!ans.hidden && !ans.textContent) ans.append(h('small', { text: 'Answer' }), item.a);
@@ -603,7 +616,7 @@
 
   function drawEditor() {
     const E = S.editing, d = E.data;
-    const scr = h('div', { class: 'qz-screen qz-scroll qz-editor' });
+    const scr = h('div', { class: 'qz-screen qz-scroll qz-editor', 'data-keyboard-menu': '' });
     const head = h('div', { class: 'qz-ed-head' },
       h('button', { class: 'ifpd-btn', text: '← Back', onclick: () => { sfx('click'); S.editing = null; if (S.set && !S.finished && ui) { setScreen(ui.scr, 'game'); sizeBuzzers(); refresh(); } else showSetup(); } }),
       h('input', { class: 'qz-input', value: d.name, maxLength: 60, placeholder: 'Set name', oninput: e => { d.name = e.target.value; } }),
@@ -743,8 +756,97 @@
     });
   }
 
+  // ---------------------------------------------------------------- keyboard
+  // Board: arrows move a highlight, Enter opens. Question: team N buzzes with key N (same timestamp
+  // rule as the touch buzzers); teacher: C correct, X wrong, R reveal, B / Esc back to board.
+  const kb = { c: 0, r: 0, shown: false, help: '' };
+  function kbMode() { return !!window.CosmiqInput && CosmiqInput.mode === 'keyboard'; }
+
+  function keyHelp() {
+    if (!window.CosmiqInput) return;
+    const q = S.q, n = S.teams.length;
+    const buzz = [n > 2 ? `1 – ${n}` : '1 2', 'Team buzzers (team 1 = key 1 …)'];
+    let id, rows;
+    if (S.screen !== 'game') {
+      id = 'menu';
+      rows = [['Tab', 'Next button / box'], ['← → ↑ ↓', 'Move between buttons'], ['Enter', 'Press']];
+    } else if (!q) {
+      id = 'board' + n;
+      rows = [['← ↑ → ↓', 'Choose a question'], ['Enter', 'Open it'], buzz];
+    } else if (q.phase === 'answering') {
+      id = 'answering' + n;
+      rows = [['C', 'Correct'], ['X', 'Wrong'], buzz];
+    } else if (q.phase === 'revealed') {
+      id = 'revealed';
+      rows = [['B Esc', 'Back to the board']];
+    } else {
+      id = 'open' + n;
+      rows = [buzz, ['R', 'Reveal the answer']];
+    }
+    if (id === kb.help) return;
+    kb.help = id;
+    CosmiqInput.keys.help('Quiz Show', rows);
+  }
+
+  // Enter on a button the player tabbed to presses that button; focus left by a mouse click doesn't count.
+  function keyForButton(e) {
+    const b = e.target && e.target.closest && e.target.closest('button, a[href]');
+    if (!b || b.classList.contains('qz-tile')) return false;
+    if (b.matches(':focus-visible')) return true;
+    b.blur();
+    return false;
+  }
+
+  const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (window.CosmiqInput) {
+    CosmiqInput.onChange(() => { kb.help = ''; if (kbMode()) kb.shown = true; refresh(); keyHelp(); focusStart(); });
+    CosmiqInput.keys.on(e => {
+      if (S.screen !== 'game' || !ui || IFPD.overlay.visible) return;
+      const q = S.q;
+      const team = /^(Digit|Numpad)[1-4]$/.test(e.code) ? Number(e.code.slice(-1)) - 1 : -1;
+      if (team >= 0 && team < S.teams.length) {
+        e.preventDefault();
+        const bz = ui.teams[team].buzzer;
+        if (e.type === 'keyup') { bz.classList.remove('down'); return; }
+        if (e.repeat) return;
+        bz.classList.add('down');
+        pressBuzzer(team, e.timeStamp);
+        return;
+      }
+      if (e.type !== 'keydown') return;
+      if (!q) {
+        if (ARROWS[e.key]) {
+          e.preventDefault();
+          if (kb.shown) {
+            kb.c = Math.max(0, Math.min(4, kb.c + ARROWS[e.key][0]));
+            kb.r = Math.max(0, Math.min(4, kb.r + ARROWS[e.key][1]));
+            sfx('tick', { volume: 0.4, pitch: 1.6 });
+          }
+          kb.shown = true;
+          refresh();
+        } else if (e.key === 'Enter' && !keyForButton(e)) {
+          e.preventDefault();
+          if (e.repeat) return;
+          if (!kb.shown) { kb.shown = true; refresh(); return; }
+          if (S.used[kb.c * 5 + kb.r]) { sfx('click', { volume: 0.6, pitch: 0.8 }); IFPD.toast('Already played — pick another tile'); return; }
+          openTile(kb.c, kb.r);
+        }
+        return;
+      }
+      if (e.repeat) return;
+      const k = e.code;
+      if (k === 'KeyC' && q.phase === 'answering') { e.preventDefault(); judge(true); }
+      else if (k === 'KeyX' && q.phase === 'answering') { e.preventDefault(); judge(false); }
+      else if (k === 'KeyR' && q.phase === 'open') { e.preventDefault(); reveal('skip'); }
+      else if ((k === 'KeyB' || e.key === 'Escape') && q.phase === 'revealed') { e.preventDefault(); backToBoard(); }
+      else if (e.key === 'Enter' && q.phase === 'revealed' && !keyForButton(e)) { e.preventDefault(); backToBoard(); }
+    });
+    window.addEventListener('blur', () => { if (ui) ui.teams.forEach(T => T.buzzer.classList.remove('down')); });
+  }
+
   // ---------------------------------------------------------------- boot
   showSetup();
+  keyHelp();
 
   window.__game = {
     S, VALUES, QUESTION_TIME, BUILTIN,

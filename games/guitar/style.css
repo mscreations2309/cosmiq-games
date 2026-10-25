@@ -51,6 +51,9 @@
   gap: 2px;
 }
 .pad small { font-size: 15px; font-weight: 600; opacity: 0.75; }
+.pad kbd { display: none; margin-top: 4px; padding: 0 9px; border-radius: 6px; border: 1px solid #ffffff55;
+  border-bottom-width: 3px; background: #00000040; font: 700 17px "Segoe UI", sans-serif; }
+html[data-input-mode=keyboard] .pad kbd { display: block; }
 .pad.active { background: linear-gradient(#d9a441, #a8701d); color: #2b1606; box-shadow: 0 3px 0 #6b440d, 0 6px 14px #000a; transform: translateY(3px); }
 .pad.target { outline: 4px solid #2ecc71; outline-offset: 3px; animation: padPulse 0.9s ease-in-out infinite alternate; }
 .pad.open { background: linear-gradient(#3b4048, #262a30); }

@@ -94,6 +94,85 @@
     },
   });
 
+  // ---- keyboard: one key per hole, laid out like the grid on screen ----
+  // Each keyboard row is a row of holes. 1 player / player 1 use the left letters (Q W E R …),
+  // player 2 the right-hand end (… I O P / K L ; / , . /). Built from S.cols so it always matches the grid.
+  const KEY_ROWS = [
+    [['KeyQ', 'Q'], ['KeyW', 'W'], ['KeyE', 'E'], ['KeyR', 'R'], ['KeyT', 'T']],
+    [['KeyA', 'A'], ['KeyS', 'S'], ['KeyD', 'D'], ['KeyF', 'F'], ['KeyG', 'G']],
+    [['KeyZ', 'Z'], ['KeyX', 'X'], ['KeyC', 'C'], ['KeyV', 'V'], ['KeyB', 'B']],
+  ];
+  const KEY_ROWS_P2 = [
+    [['KeyY', 'Y'], ['KeyU', 'U'], ['KeyI', 'I'], ['KeyO', 'O'], ['KeyP', 'P']],
+    [['KeyH', 'H'], ['KeyJ', 'J'], ['KeyK', 'K'], ['KeyL', 'L'], ['Semicolon', ';']],
+    [['KeyN', 'N'], ['KeyM', 'M'], ['Comma', ','], ['Period', '.'], ['Slash', '/']],
+  ];
+  let keyMap = new Map(); // code -> { f, ho }
+
+  function holeKey(fieldIdx, r, c) {
+    return fieldIdx === 0 ? KEY_ROWS[r][c] : KEY_ROWS_P2[r][5 - S.cols + c];
+  }
+
+  function buildKeys() {
+    keyMap = new Map();
+    for (const f of S.fields) for (const ho of f.holes) {
+      const [code, label] = holeKey(f.idx, ho.r, ho.c);
+      ho.key = label;
+      keyMap.set(code, { f, ho });
+    }
+    const rowNames = ['top row', 'middle row', 'bottom row'];
+    // (a bare "/" is shown as joining text by the help card, so mark it as a key with an invisible joiner)
+    const rowKeys = (fi, r) => Array.from({ length: S.cols }, (_, c) => holeKey(fi, r, c)[1].replace('/', '/\u2060')).join(' ');
+    const rows = [];
+    for (const f of S.fields) for (let r = 0; r < S.rows; r++) {
+      rows.push([rowKeys(f.idx, r), (S.fields.length === 2 ? `Player ${f.idx + 1} ` : 'Holes, ') + rowNames[r]]);
+    }
+    rows.push(['Esc', 'Modes menu']);
+    CosmiqInput.keys.help('Whack-a-Mole', rows);
+  }
+
+  CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown') return;
+    if (S.phase !== 'countdown' && S.phase !== 'play') return;
+    if (IFPD.overlay.visible) return;
+    if (e.code === 'Escape') { if (!e.repeat) showMenu(); e.preventDefault(); return; }
+    const k = keyMap.get(e.code);
+    if (!k) return;
+    e.preventDefault();
+    if (e.repeat) return;
+    keyWhack(k.f, k.ho);
+  });
+
+  // Same rules as a tap: only a visible mole counts; the mallet swings at that hole.
+  function keyWhack(f, ho) {
+    const visible = S.phase === 'play' && ho.h >= 0.08 && ho.state !== 'idle' && ho.state !== 'hit' && ho.state !== 'gone';
+    const { x, y } = visible ? moleCenter(ho) : { x: ho.cx, y: ho.cy };
+    S.swings.push({ x, y, t: 0, flip: f.idx === 1 ? -1 : 1, hit: visible });
+    const panX = U.clamp(x / L.w * 2 - 1, -1, 1) * 0.8;
+    if (S.phase !== 'play') IFPD.sfx.play('whoosh', { volume: 0.3, pitch: 1.6 });
+    else if (visible) whack(f, ho, x, y, panX);
+    else IFPD.sfx.play('thud', { volume: 0.35, pitch: 1.6, pan: panX });
+  }
+
+  function drawKeyCaps(g) {
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const f of S.fields) for (const ho of f.holes) {
+      if (!ho.key) continue;
+      // on the front of the dirt mound, below the pit
+      const sz = U.clamp(ho.ry * 0.95, 18, 40);
+      const x = ho.cx, y = ho.cy + ho.ry * 1.45;
+      g.font = `800 ${Math.round(sz * 0.62)}px ${FONT}`;
+      g.fillStyle = 'rgba(0,0,0,0.35)';
+      IFPD.draw.roundRect(g, x - sz / 2, y - sz / 2 + 3, sz, sz, sz * 0.22); g.fill();
+      g.fillStyle = 'rgba(250,248,240,0.92)';
+      IFPD.draw.roundRect(g, x - sz / 2, y - sz / 2, sz, sz, sz * 0.22); g.fill();
+      g.strokeStyle = S.fields.length === 2 ? PCOL[f.idx] : 'rgba(60,40,20,0.6)'; g.lineWidth = 2;
+      g.stroke();
+      g.fillStyle = '#2a2018';
+      g.fillText(ho.key, x, y + 1);
+    }
+  }
+
   function moleCenter(ho) {
     const e = 1 - (1 - ho.h) * (1 - ho.h);
     return { x: ho.cx, y: ho.cy + ho.mr * 0.9 - e * ho.mr * 2.05 };
@@ -142,6 +221,7 @@
   // ---- flow ----
   function showMenu() {
     S.phase = 'menu';
+    CosmiqInput.keys.help('Whack-a-Mole', [['Tab ← →', 'Choose'], ['Enter', 'Start']]);
     const b1 = IFPD.best.get('whack-1p'), b2 = IFPD.best.get('whack-2p');
     IFPD.overlay.show({
       title: 'Whack-a-Mole',
@@ -169,11 +249,13 @@
     S.lastTick = 4;
     S.phase = 'countdown';
     layout();
+    buildKeys();
     bgCanvas = null;
   }
 
   function endRound() {
     S.phase = 'over';
+    CosmiqInput.keys.help('Whack-a-Mole', [['Tab ← →', 'Choose'], ['Enter', 'Select']]);
     for (const f of S.fields) for (const ho of f.holes) if (ho.state !== 'idle' && ho.state !== 'hit') ho.state = 'sink';
     IFPD.sfx.play('buzzer', { volume: 0.6 });
     let title, text;
@@ -740,6 +822,7 @@
       else { g.fillStyle = p.color; g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill(); }
     }
     g.globalAlpha = 1;
+    if (CosmiqInput.mode === 'keyboard' && S.phase !== 'menu') drawKeyCaps(g);
     for (const s of S.swings) drawMallet(g, s);
     // popups
     for (const p of S.popups) {

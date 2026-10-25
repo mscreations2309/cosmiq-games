@@ -16,6 +16,7 @@
     phase: 'menu',          // menu | play | ending | over
     strokes: [], old: null, // current sheet strokes; previous sheet sliding away
     timers: [], after: null, round: 0, win: null, thinking: false, time: 0,
+    cursor: 4, kbUsed: false, // keyboard highlight (cell index) and whether keys have been used
   };
 
   IFPD.setupPage({ title: 'Tic-Tac-Toe', onRestart: restart });
@@ -395,6 +396,7 @@
 
   function showMenu() {
     S.phase = 'menu';
+    showKeyHelp();
     overlay({
       title: 'Tic-Tac-Toe',
       text: 'Get three in a row to win.\nChoose how you want to play:',
@@ -424,6 +426,7 @@
     S.scores = { X: 0, O: 0, D: 0 };
     S.starter = 'O'; // newRound flips it, so X starts the first round
     newRound();
+    showKeyHelp();
   }
 
   function newRound() {
@@ -438,6 +441,7 @@
     S.win = null;
     S.strokes = gridStrokes();
     S.phase = 'play';
+    S.cursor = 4;
     if (S.old) sfx.play('whoosh', { volume: 0.8 });
     whenIdle(nextTurn);
   }
@@ -550,6 +554,94 @@
       return false;
     },
   });
+
+  // ---------------------------------------------------------------- keyboard
+  // 1–9 = squares in reading order (1 2 3 = top row); the numpad maps the way the squares look
+  // (Numpad7 = top-left). Arrows move a highlight, Enter / Space place on it.
+  const NUMPAD = { Numpad7: 0, Numpad8: 1, Numpad9: 2, Numpad4: 3, Numpad5: 4, Numpad6: 5, Numpad1: 6, Numpad2: 7, Numpad3: 8 };
+  const ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  const kbMode = () => !!window.CosmiqInput && CosmiqInput.mode === 'keyboard';
+
+  function showKeyHelp() {
+    if (!window.CosmiqInput) return;
+    if (S.phase === 'menu') CosmiqInput.keys.help('Tic-Tac-Toe', [['Tab ← →', 'Choose'], ['Enter', 'Select']]);
+    else CosmiqInput.keys.help('Tic-Tac-Toe', [['1 – 9', 'Pick a square (1 2 3 = top row)'], ['Numpad', '7 8 9 = top row, like the board'],
+      ['← ↑ → ↓', 'Move the highlight'], ['Enter Space', 'Place your mark']]);
+  }
+
+  // Enter / Space on a top-bar button the player tabbed to should press it; a button that only
+  // kept focus after a mouse click must not swallow game keys.
+  function keyForButton(e) {
+    const b = e.target && e.target.closest && e.target.closest('button, a[href]');
+    if (!b) return false;
+    if (b.matches(':focus-visible')) return true;
+    b.blur();
+    return false;
+  }
+
+  function keyPlace(i) {
+    if (!canHumanPlay() || S.board[i]) { sfx.play('tick', { volume: 0.6 }); return; }
+    place(i);
+  }
+
+  if (window.CosmiqInput) CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown' || S.phase !== 'play' || IFPD.overlay.visible) return;
+    let cell = -1;
+    if (/^Digit[1-9]$/.test(e.code)) cell = Number(e.code[5]) - 1;
+    else if (e.code in NUMPAD) cell = NUMPAD[e.code];
+    if (cell >= 0) {
+      e.preventDefault();
+      if (e.repeat) return;
+      S.cursor = cell;
+      keyPlace(cell);
+    } else if (ARROWS[e.key]) {
+      e.preventDefault();
+      const [dx, dy] = ARROWS[e.key];
+      if (S.kbUsed || kbMode()) S.cursor = (S.cursor % 3 + dx + 3) % 3 + ((Math.floor(S.cursor / 3) + dy + 3) % 3) * 3;
+      S.kbUsed = true;
+      sfx.play('tick', { volume: 0.35 });
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (keyForButton(e)) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      S.kbUsed = true;
+      keyPlace(S.cursor);
+    }
+  });
+
+  // Small key digits in the empty squares (keyboard mode) and the highlight square.
+  function drawKeyHints(ctx) {
+    const showDigits = kbMode(), showCursor = S.kbUsed || kbMode();
+    if (S.phase !== 'play' || (!showDigits && !showCursor)) return;
+    const sh = L.sheet, s = sh.s;
+    ctx.save();
+    ctx.translate(sh.x + s / 2, sh.y + s / 2);
+    ctx.rotate(SHEET_ANGLE);
+    ctx.translate(-s / 2, -s / 2);
+    if (showDigits) {
+      ctx.font = `bold ${s * CS * 0.2}px ${HAND}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(60,60,70,0.42)';
+      for (let i = 0; i < 9; i++) {
+        if (S.board[i]) continue;
+        const [cx, cy] = cellCenter(i);
+        ctx.fillText(String(i + 1), (cx - CS * 0.27) * s, (cy - CS * 0.25) * s);
+      }
+    }
+    if (showCursor) {
+      const [cx, cy] = cellCenter(S.cursor), h = CS * 0.43;
+      const mine = canHumanPlay() || (S.mode === '2p' && !busy());
+      ctx.globalAlpha = mine ? 0.75 + 0.2 * Math.sin(S.time * 5) : 0.3;
+      ctx.strokeStyle = INK[S.mode === 'cpu' ? 'X' : S.turn];
+      ctx.lineWidth = s * 0.008;
+      ctx.setLineDash([s * 0.02, s * 0.014]);
+      draw.roundRect(ctx, (cx - h) * s, (cy - h) * s, h * 2 * s, h * 2 * s, s * 0.02);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  }
 
   // ---------------------------------------------------------------- loop
   let squeakCd = 0;
@@ -718,6 +810,7 @@
     const ctx = view.ctx;
     ctx.drawImage(bg, 0, 0, L.W, L.H);
     drawSheet(ctx, S.strokes, 0, 0, 0);
+    drawKeyHints(ctx);
     if (S.old) {
       const k = Math.pow(S.old.t / 0.8, 2);
       drawSheet(ctx, S.old.strokes, S.old.dir * k * L.W * 0.9, -k * L.H * 0.25, S.old.dir * k * 0.5);

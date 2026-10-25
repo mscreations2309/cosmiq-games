@@ -49,3 +49,15 @@
 .maze-hud.narrow .short { display: inline; }
 .maze-hud.tiny .who { font-size: 20px; padding: 4px 10px; }
 .maze-hud.tiny .time { font-size: 26px; min-width: 110px; padding: 6px 10px; }
+
+/* keyboard hints (keyboard mode only) */
+.maze-hud .keys { display: none; gap: 3px; }
+html[data-input-mode=keyboard] .maze-hud .keys { display: inline-flex; }
+html[data-input-mode=keyboard] .maze-hud.tiny .keys { display: none; }
+.maze-hud kbd {
+  display: inline-block; min-width: 1.5em; padding: 0 6px; border-radius: 6px;
+  border: 1px solid #ffffff66; border-bottom-width: 3px; background: #ffffff1c; color: #fff;
+  font: 700 17px/1.45 "Segoe UI", sans-serif; text-align: center;
+}
+.maze-hud .ifpd-btn kbd { display: none; margin-left: 8px; }
+html[data-input-mode=keyboard] .maze-hud .ifpd-btn kbd { display: inline-block; }

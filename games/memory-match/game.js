@@ -63,6 +63,7 @@
   let L = null;                  // layout
   let sprites = { key: '', faces: new Map(), back: null, shadow: null, glow: null };
   let bg = null;
+  let cursor = 0, kbUsed = false; // keyboard highlight (card index) and whether keys have been used
 
   // ---------------------------------------------------------------------------
   // Layout
@@ -282,6 +283,7 @@
     open = []; busy = false; resolveAt = 0; flipBackAt = 0; moves = 0; pairsFound = 0; elapsed = 0; timing = false;
     players = Array.from({ length: cfg.players }, (_, i) => ({ name: 'Player ' + (i + 1), color: PLAYER_COLORS[i], score: 0 }));
     current = 0;
+    cursor = 0;
     banner = cfg.players > 1 ? { text: players[0].name + ' starts', color: players[0].color, t: 0 } : null;
     state = 'deal';
     computeLayout();
@@ -295,6 +297,7 @@
     IFPD.overlay.hide();
     deal();
     loop.resume();
+    showKeyHelp();
   }
 
   function restart() { if (state !== 'menu') start({}); }
@@ -429,6 +432,54 @@
     },
   });
 
+  // Keyboard: arrows move a highlight over the cards (wrapping row to row), Enter / Space flips it.
+  const kbMode = () => !!window.CosmiqInput && CosmiqInput.mode === 'keyboard';
+
+  function showKeyHelp() {
+    if (!window.CosmiqInput) return;
+    if (state === 'menu') CosmiqInput.keys.help('Memory Match', [['Tab ← →', 'Choose'], ['Enter', 'Select / Start']]);
+    else CosmiqInput.keys.help(cfg.players > 1 ? 'Memory Match · take turns' : 'Memory Match',
+      [['← ↑ → ↓', 'Move the highlight'], ['Enter Space', 'Turn the card over']]);
+  }
+
+  // Enter / Space on a top-bar button the player tabbed to should press it; a button that only
+  // kept focus after a mouse click must not swallow game keys.
+  function keyForButton(e) {
+    const b = e.target && e.target.closest && e.target.closest('button, a[href]');
+    if (!b) return false;
+    if (b.matches(':focus-visible')) return true;
+    b.blur();
+    return false;
+  }
+
+  function moveCursor(dx, dy) {
+    const n = cards.length, cols = L.cols, rows = Math.ceil(n / cols);
+    if (dx) cursor = (cursor + dx + n) % n;                        // left / right run on into the next row
+    else {
+      const c = cursor % cols, r = (Math.floor(cursor / cols) + dy + rows) % rows;
+      cursor = Math.min(n - 1, r * cols + c);                     // up / down wrap within the column
+    }
+  }
+
+  if (window.CosmiqInput) CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown' || (state !== 'play' && state !== 'deal') || IFPD.overlay.visible || menuEl || !cards.length) return;
+    const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (dir) {
+      e.preventDefault();
+      if (kbUsed || kbMode()) moveCursor(dir[0], dir[1]);
+      kbUsed = true;
+      IFPD.sfx.play('tick', { volume: 0.3, pan: panOf(cards[cursor]) });
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      if (keyForButton(e)) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      kbUsed = true;
+      const c = cards[cursor];
+      if (state === 'play' && !busy && open.length < 2 && (c.state !== 'down' || c.flip > 0.05)) IFPD.sfx.play('tick', { volume: 0.5 });
+      else tryFlip(c);
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
@@ -536,6 +587,24 @@
     ctx.restore();
   }
 
+  function drawCursor(ctx) {
+    const p = slot(cursor), w = L.cw, h = L.ch, pad = L.gap * 0.32 + 3;
+    const col = cfg.players > 1 ? players[current].color : '#ffd27a';
+    const pulse = 0.5 + 0.5 * Math.sin(simTime * 6);
+    ctx.save();
+    ctx.shadowColor = col; ctx.shadowBlur = 14 + pulse * 10;
+    ctx.lineWidth = Math.max(4, w * 0.035);
+    ctx.strokeStyle = col;
+    ctx.globalAlpha = 0.8 + 0.2 * pulse;
+    rr(ctx, p.x - w / 2 - pad, p.y - h / 2 - pad, w + pad * 2, h + pad * 2, w * 0.1);
+    ctx.stroke();
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+    rr(ctx, p.x - w / 2 - pad, p.y - h / 2 - pad, w + pad * 2, h + pad * 2, w * 0.1);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   function txt(ctx, s, x, y, size, color, align = 'center', weight = 700) {
     ctx.font = `${weight} ${size}px ${FONT}`;
     ctx.textAlign = align; ctx.textBaseline = 'middle';
@@ -595,6 +664,7 @@
     // draw lifted cards last so they sit above their neighbours
     const order = cards.slice().sort((a, b) => (a.lift + Math.sin(a.flip * Math.PI) + (a.dealT < 1 ? 2 : 0)) - (b.lift + Math.sin(b.flip * Math.PI) + (b.dealT < 1 ? 2 : 0)));
     for (const c of order) drawCard(ctx, c);
+    if ((kbUsed || kbMode()) && cards[cursor] && (state === 'play' || state === 'deal')) drawCursor(ctx);
     if (banner) {
       const t = banner.t, a = t < 0.2 ? t / 0.2 : t > 1.2 ? Math.max(0, (1.6 - t) / 0.4) : 1;
       const fs = clamp(Math.min(W, H) * 0.075, 34, 80);
@@ -624,6 +694,7 @@
   function showMenu() {
     state = 'menu';
     cards = []; open = []; busy = false; banner = null;
+    showKeyHelp();
     IFPD.overlay.hide();
     hideMenu();
     const o = document.createElement('div');
@@ -674,7 +745,7 @@
   window.__game = {
     get state() { return state; }, get cards() { return cards; }, get open() { return open; }, get busy() { return busy; },
     get moves() { return moves; }, get pairsFound() { return pairsFound; }, get players() { return players; }, get current() { return current; },
-    get cfg() { return cfg; }, get elapsed() { return elapsed; },
+    get cfg() { return cfg; }, get elapsed() { return elapsed; }, get cursor() { return cursor; },
     center(i) { const p = slot(i); return [p.x, p.y]; },
     start, showMenu,
   };

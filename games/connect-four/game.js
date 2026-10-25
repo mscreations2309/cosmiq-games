@@ -484,6 +484,7 @@
   function showMenu() {
     S.phase = 'menu';
     updateUndo();
+    showKeyHelp();
     overlay({
       title: 'Connect Four',
       text: 'Drop discs to get four in a row —\nacross, down or diagonally.',
@@ -513,6 +514,7 @@
     S.scores = { 1: 0, 2: 0, D: 0 };
     S.starter = YEL; // flipped by newRound → Red starts round 1
     newRound();
+    showKeyHelp();
   }
 
   function clearFlow() {
@@ -719,6 +721,89 @@
   });
 
   // =====================================================================================
+  // Keyboard — 1–7 drop straight into a column; ← → move the hovering disc, ↓ / Enter / Space
+  // drop it; Backspace or U = Undo (2 players). Same locks as touch.
+  // =====================================================================================
+  const kbMode = () => !!window.CosmiqInput && CosmiqInput.mode === 'keyboard';
+
+  function showKeyHelp() {
+    if (!window.CosmiqInput) return;
+    if (S.phase === 'menu') { CosmiqInput.keys.help('Connect Four', [['Tab ← →', 'Choose'], ['Enter', 'Select']]); return; }
+    const rows = [['1 – 7', 'Drop into that column'], ['← →', 'Move the disc'], ['↓ Enter Space', 'Drop it']];
+    if (S.mode === '2p') rows.push(['Backspace U', 'Undo']);
+    CosmiqInput.keys.help('Connect Four', rows);
+  }
+
+  // Enter / Space on a top-bar button the player tabbed to should press it; a button that only
+  // kept focus after a mouse click must not swallow game keys.
+  function keyForButton(e) {
+    const b = e.target && e.target.closest && e.target.closest('button, a[href]');
+    if (!b) return false;
+    if (b.matches(':focus-visible')) return true;
+    b.blur();
+    return false;
+  }
+
+  function keyDrop(col) {
+    if (owner !== null || !canHumanPlay()) { sfx.play('tick', { volume: 0.5 }); return; }
+    S.previewX = col;
+    if (S.heights[col] >= ROWS) {
+      S.aim = col;
+      sfx.play('wrong', { volume: 0.6 });
+      IFPD.toast('That column is full', 1200);
+      return;
+    }
+    S.aim = -1;
+    drop(col);
+  }
+
+  if (window.CosmiqInput) CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown' || S.phase !== 'play' || IFPD.overlay.visible) return;
+    const k = e.key, cur = S.aim >= 0 ? S.aim : util.clamp(Math.round(S.previewX), 0, COLS - 1);
+    if (/^(Digit|Numpad)[1-7]$/.test(e.code)) {
+      e.preventDefault();
+      if (!e.repeat) keyDrop(Number(e.code.slice(-1)) - 1);
+    } else if (k === 'ArrowLeft' || k === 'ArrowRight') {
+      e.preventDefault();
+      if (owner !== null || !canHumanPlay()) return;
+      const col = util.clamp(cur + (k === 'ArrowLeft' ? -1 : 1), 0, COLS - 1);
+      if (S.previewShow < 0.05) S.previewX = cur;
+      S.aim = col;
+      sfx.play('tick', { volume: col === cur ? 0.3 : 0.7, pan: (col - 3) / 4 });
+    } else if (k === 'ArrowDown' || k === 'Enter' || k === ' ') {
+      if (k !== 'ArrowDown' && keyForButton(e)) return;
+      e.preventDefault();
+      if (!e.repeat) keyDrop(cur);
+    } else if (e.code === 'Backspace' || e.code === 'KeyU') {
+      e.preventDefault();
+      if (!e.repeat && S.mode === '2p') undoMove();
+    }
+  });
+
+  // Column numbers in key caps along the top of the frame (keyboard mode).
+  function drawColumnKeys(ctx) {
+    if (!kbMode() || S.phase !== 'play') return;
+    const { c, fy } = L, w = c * 0.42, h = c * 0.34;
+    const sel = canHumanPlay() ? (S.aim >= 0 ? S.aim : Math.round(S.previewX)) : -1;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `800 ${c * 0.25}px "Segoe UI", system-ui, Roboto, sans-serif`;
+    for (let col = 0; col < COLS; col++) {
+      const x = colX(col), y = fy + c * 0.05, on = col === sel;
+      ctx.fillStyle = on ? '#ffd27a' : 'rgba(10,20,50,0.82)';
+      draw.roundRect(ctx, x - w / 2, y - h / 2, w, h, c * 0.07);
+      ctx.fill();
+      ctx.lineWidth = Math.max(1, c * 0.02);
+      ctx.strokeStyle = on ? '#fff6d8' : 'rgba(200,220,255,0.55)';
+      ctx.stroke();
+      ctx.fillStyle = on ? '#1b1c22' : '#f3f1ea';
+      ctx.fillText(String(col + 1), x, y + c * 0.01);
+    }
+    ctx.restore();
+  }
+
+  // =====================================================================================
   // Update & render
   // =====================================================================================
   function update(dt) {
@@ -822,6 +907,7 @@
         }
       }
     }
+    drawColumnKeys(ctx);
     drawPanels(ctx);
   }
 

@@ -13,6 +13,7 @@
       this.lastSource = new Map(); // note -> source of most recent press (for key colour)
       this.sustain = false;
       this.guide = new Set();      // keys to highlight as "press next" (song teacher)
+      this.keyLabels = new Map();  // note -> computer-keyboard letter (shown in keyboard mode)
       this.listeners = new Set();
     }
 

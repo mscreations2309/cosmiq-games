@@ -12,6 +12,7 @@
   const G = 1500;                 // gravity, units/s^2
   const TRAIL_LIFE = 150;         // ms a blade trail point lives
   const SLICE_SPEED = 0.38;       // min blade speed in field-heights per second
+  const VIRTUAL_SLICE_PX = 150;   // keyboard cursor / camera hand: min blade speed in CSS px per second
   const STAIN_LIFE = 9;           // s
   const MAX_STAINS = 26;
   const COMBO_GAP = 280;          // ms without a slice that ends a swipe's combo
@@ -526,8 +527,26 @@
     explodeT = 0; globalFlash = 0;
     blades.clear(); fadingBlades.length = 0;
     loop.resume();
+    keyboardPlay(true);
     IFPD.sfx.play('whoosh', { volume: 0.8 });
   }
+
+  // Keyboard: the shared keyboard cursor is the blade (arrows / W A S D move it, hold Space to cut).
+  function keyboardPlay(on) {
+    CosmiqInput.keys.cursor(on);
+    if (!on) CosmiqInput.keys.help('Fruit Slice', [['Tab ← →', 'Choose'], ['Enter', 'Start']]);
+    else {
+      const rows = [['Space', 'Hold to slice'], ['↑ ← ↓ →', 'Move the blade (W A S D too)'], ['Shift', 'Move slowly'], ['Esc', 'Modes menu']];
+      if (mode === 'duo') rows.push(['Touch', 'Player 2 slices with touch or the mouse']);
+      CosmiqInput.keys.help(mode === 'duo' ? 'Fruit Slice · Player 1' : 'Fruit Slice', rows);
+    }
+  }
+  CosmiqInput.keys.on(e => {
+    if (e.type === 'keydown' && e.code === 'Escape' && !e.repeat && (state === 'play' || state === 'exploding') && !IFPD.overlay.visible) {
+      e.preventDefault();
+      showMenu();
+    }
+  });
 
   function restart() {
     if (mode) start(mode); else showMenu();
@@ -537,6 +556,7 @@
 
   function showMenu() {
     state = 'menu';
+    keyboardPlay(false);
     newFields(1, true);
     const b = m => { const v = IFPD.best.get(bestKey(m)); return v == null ? '' : `  (best ${v})`; };
     IFPD.overlay.show({
@@ -554,6 +574,7 @@
   function endGame() {
     if (state === 'over') return;
     state = 'over';
+    keyboardPlay(false);
     for (const b of blades.values()) finishCombo(b);
     let title, text;
     let record = false;
@@ -659,7 +680,10 @@
     const dtMs = Math.max(4, now - last.t);
     const speed = (seg / dtMs) * 1000 / H; // field heights per second
     b.speed = speed;
-    if (state !== 'play' || speed < SLICE_SPEED) return;
+    // Virtual pointers (keyboard cursor, camera hand) move steadily rather than in fast flicks, so they
+    // slice at any deliberate speed (Shift-slow keyboard moves are ~220 px/s).
+    const slow = b.virtual ? speed * H < VIRTUAL_SLICE_PX : speed < SLICE_SPEED;
+    if (state !== 'play' || slow) return;
     const f = b.field;
     if (!f || f.out || f.freeze > 0) return;
     const ax = (last.x - f.x0) / U, ay = last.y / U, bx = (x - f.x0) / U, by = y / U;
@@ -802,7 +826,8 @@
   IFPD.pointers(canvas, {
     down(p) {
       if (state !== 'play') return false;
-      const b = { id: p.id, field: fieldAt(p.x), pts: [{ x: p.x, y: p.y, t: performance.now() }], combo: 0, comboX: 0, comboY: 0, lastSlice: 0, speed: 0 };
+      const b = { id: p.id, field: fieldAt(p.x), pts: [{ x: p.x, y: p.y, t: performance.now() }], combo: 0, comboX: 0, comboY: 0, lastSlice: 0, speed: 0,
+        virtual: !!(window.CosmiqPointer && window.CosmiqPointer.isActive(p.id)) };
       blades.set(p.id, b);
       return true;
     },
@@ -1052,6 +1077,11 @@
     }
     if (f.freeze > 0 && !f.out) {
       text(ctx, 'Blade frozen!', f.fw / 2, 190, 46, '#9fe0ff', 'center', 800);
+    }
+    if (CosmiqInput.mode === 'keyboard' && state === 'play' && f.elapsed < 6) {
+      ctx.globalAlpha = clamp(6 - f.elapsed, 0, 1);
+      text(ctx, f.idx === 0 ? 'Hold Space + arrow keys to slice' : 'Player 2: touch or mouse', f.fw / 2, 900, 46, '#ffffff', 'center', 800);
+      ctx.globalAlpha = 1;
     }
   }
 

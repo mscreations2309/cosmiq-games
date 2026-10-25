@@ -22,3 +22,17 @@
   white-space: nowrap;
 }
 .ifpd-btn.jig-on { background: linear-gradient(#3d8bfd, #2266cc); border-color: #1d5bb8; }
+.kb-hint {
+  display: none;
+  min-width: 1.4em;
+  padding: 0 6px;
+  margin-left: 6px;
+  border-radius: 6px;
+  border: 1px solid #ffffff66;
+  border-bottom-width: 3px;
+  background: #ffffff1c;
+  font: 700 0.75em/1.5 "Segoe UI", sans-serif;
+  text-align: center;
+  vertical-align: middle;
+}
+html[data-input-mode=keyboard] .kb-hint { display: inline-block; }

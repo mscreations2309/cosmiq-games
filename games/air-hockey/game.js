@@ -15,6 +15,9 @@
   const MALLET_MAX = 7500;  // human mallet follow speed cap
   const MALLET_HIT_CAP = 4600; // mallet velocity used for impulse is capped
   const FOLLOW_TAU = 0.022; // human mallet smoothing time constant (s)
+  const KEY_SPEED = 3000;   // keyboard mallet top speed (units / s)
+  const KEY_ACCEL = 16000;  // keyboard mallet acceleration toward the held direction
+  const KEY_BRAKE = 20000;  // deceleration once the keys are released
   const E_WALL = 0.88, E_MALLET = 0.8;
   const FRICTION = 0.2;     // exponential decay per second (air table: very low)
   const COLORS = ['#1f6fe0', '#e0362b'];
@@ -49,7 +52,8 @@
 
   function mkMallet(side) {
     const x = side === 0 ? 220 : W - 220;
-    return { side, x, y: H / 2, vx: 0, vy: 0, tx: x, ty: H / 2, owner: null, fingerX: 0, fingerY: 0 };
+    return { side, x, y: H / 2, vx: 0, vy: 0, tx: x, ty: H / 2, owner: null, fingerX: 0, fingerY: 0,
+      keys: false, kvx: 0, kvy: 0 }; // keys: driven by the keyboard (last input — key or finger move — wins)
   }
   function xMin(side) { return side === 0 ? MR : W / 2 + MR; }
   function xMax(side) { return side === 0 ? W / 2 - MR : W - MR; }
@@ -90,6 +94,7 @@
       const m = S.mallets[side];
       if (m.owner !== null) return false; // half already controlled: ignore extra touches
       m.owner = p.id;
+      m.keys = false;
       m.fingerX = p.x; m.fingerY = p.y;
       p.data.side = side;
       IFPD.sfx.play('click', { volume: 0.5, pan: side ? 0.6 : -0.6 });
@@ -97,7 +102,7 @@
     },
     move(p) {
       const m = S.mallets[p.data.side];
-      if (m && m.owner === p.id) { m.fingerX = p.x; m.fingerY = p.y; }
+      if (m && m.owner === p.id) { m.fingerX = p.x; m.fingerY = p.y; m.keys = false; }
     },
     up(p) {
       const m = S.mallets[p.data.side];
@@ -105,13 +110,53 @@
     },
   });
 
+  // ---- keyboard: P1 W A S D, P2 arrows (vs computer the human may use either) ----
+  const KEY_DIRS = { // code -> [player, dx, dy]
+    KeyW: [0, 0, -1], KeyS: [0, 0, 1], KeyA: [0, -1, 0], KeyD: [0, 1, 0],
+    ArrowUp: [1, 0, -1], ArrowDown: [1, 0, 1], ArrowLeft: [1, -1, 0], ArrowRight: [1, 1, 0],
+  };
+  const held = new Set();
+  const keySide = code => (S.ai ? 0 : KEY_DIRS[code][0]);
+  const playing = () => S.phase === 'play' || S.phase === 'goal';
+  CosmiqInput.keys.on(e => {
+    if (e.type === 'keyup') { held.delete(e.code); return; }
+    if (!playing() || IFPD.overlay.visible) return;
+    if (e.code === 'Escape' && !e.repeat) { showMenu(); e.preventDefault(); return; }
+    if (!KEY_DIRS[e.code]) return;
+    e.preventDefault();
+    held.add(e.code);
+    S.mallets[keySide(e.code)].keys = true;
+  });
+  window.addEventListener('blur', () => held.clear());
+
+  function keyDir(side) {
+    let dx = 0, dy = 0;
+    for (const c of held) {
+      if (keySide(c) !== side) continue;
+      dx += KEY_DIRS[c][1]; dy += KEY_DIRS[c][2];
+    }
+    const d = Math.hypot(dx, dy);
+    return d ? { x: dx / d, y: dy / d } : null;
+  }
+
+  function showKeyHelp() {
+    if (!playing()) {
+      CosmiqInput.keys.help('Air Hockey', [['Tab ← →', 'Choose'], ['Enter', 'Start']]);
+    } else if (S.ai) {
+      CosmiqInput.keys.help('Air Hockey', [['W A S D', 'Move your mallet'], ['↑ ← ↓ →', 'Arrow keys work too'], ['Esc', 'Modes menu']]);
+    } else {
+      CosmiqInput.keys.help('Air Hockey', [['W A S D', 'Blue mallet (left)'], ['↑ ← ↓ →', 'Red mallet (right)'], ['Esc', 'Modes menu']]);
+    }
+  }
+
   // ---- game flow ----
   function showMenu() {
     S.phase = 'menu';
     releaseAll();
+    showKeyHelp();
     IFPD.overlay.show({
       title: 'Air Hockey',
-      text: 'First to 7 goals wins.\nTouch your half of the table to grab your mallet.',
+      text: 'First to 7 goals wins.\nTouch your half of the table to grab your mallet\n(keyboard: W A S D and arrow keys).',
       buttons: [
         { label: '2 Players', kind: 'good', onClick: () => startMatch(null) },
         { label: 'vs Computer · Easy', kind: 'primary', onClick: () => startMatch('easy') },
@@ -121,7 +166,10 @@
     });
   }
 
-  function releaseAll() { for (const m of S.mallets) m.owner = null; }
+  function releaseAll() {
+    held.clear();
+    for (const m of S.mallets) { m.owner = null; m.keys = false; m.kvx = m.kvy = 0; }
+  }
 
   function startMatch(ai) {
     IFPD.overlay.hide();
@@ -133,6 +181,8 @@
     aiState.timer = 0; aiState.tx = W - 200; aiState.ty = H / 2;
     placePuck(Math.random() < 0.5 ? 0 : 1);
     S.phase = 'play';
+    held.clear();
+    showKeyHelp();
     IFPD.sfx.play('whoosh', { volume: 0.6 });
   }
 
@@ -169,6 +219,7 @@
     S.phase = 'over';
     S.started = true;
     releaseAll();
+    showKeyHelp();
     const winner = S.score[0] > S.score[1] ? 0 : 1;
     const names = playerNames();
     let text = `${names[0]} ${S.score[0]} : ${S.score[1]} ${names[1]}`;
@@ -217,6 +268,7 @@
     // targets
     for (const m of S.mallets) {
       if (m.side === 1 && S.ai) continue;
+      if (m.keys) continue;
       if (m.owner !== null) {
         const w = toWorld(m.fingerX, m.fingerY);
         m.tx = U.clamp(w.x, xMin(m.side), xMax(m.side));
@@ -283,6 +335,18 @@
       if (a > amax) { ax *= amax / a; ay *= amax / a; }
       const vx = m.vx + ax, vy = m.vy + ay;
       m.x += vx * h; m.y += vy * h;
+    } else if (m.keys) {
+      // Keyboard: accelerate toward the held direction up to KEY_SPEED, brake when released.
+      // The mallet then really moves, so its velocity carries into the puck like a flick.
+      const dir = keyDir(m.side);
+      const tvx = dir ? dir.x * KEY_SPEED : 0, tvy = dir ? dir.y * KEY_SPEED : 0;
+      let ax = tvx - m.kvx, ay = tvy - m.kvy;
+      const a = Math.hypot(ax, ay), amax = (dir ? KEY_ACCEL : KEY_BRAKE) * h;
+      if (a > amax) { ax *= amax / a; ay *= amax / a; }
+      m.kvx += ax; m.kvy += ay;
+      m.x += m.kvx * h; m.y += m.kvy * h;
+      if (m.x < xMin(m.side) || m.x > xMax(m.side)) m.kvx = 0;
+      if (m.y < MR || m.y > H - MR) m.kvy = 0;
     } else if (m.owner !== null) {
       const dx = m.tx - m.x, dy = m.ty - m.y;
       const d = Math.hypot(dx, dy);
@@ -566,7 +630,7 @@
     g.beginPath(); g.arc(x - 3, y - 5, MR * 0.36, 0, Math.PI * 2); g.fill();
     IFPD.draw.ball(g, x - 6, y - 12, MR * 0.42, col, 0.6);
     // grab highlight when held
-    if (m.owner !== null) {
+    if (m.owner !== null || (m.keys && (m.kvx || m.kvy))) {
       g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 5;
       g.beginPath(); g.arc(x, y, MR + 9, 0, Math.PI * 2); g.stroke();
     }
@@ -643,8 +707,9 @@
       g.fillStyle = '#20325a';
       g.font = `600 44px ${FONT}`;
       g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText('Touch here to grab your mallet', W * 0.25, H * 0.15);
-      if (!S.ai) g.fillText('Touch here to grab your mallet', W * 0.75, H * 0.15);
+      const kb = CosmiqInput.mode === 'keyboard';
+      g.fillText(kb ? (S.ai ? 'W A S D or arrow keys' : 'W A S D to move') : 'Touch here to grab your mallet', W * 0.25, H * 0.15);
+      if (!S.ai) g.fillText(kb ? 'Arrow keys to move' : 'Touch here to grab your mallet', W * 0.75, H * 0.15);
       g.globalAlpha = 1;
     }
     // goal flash on the conceding end

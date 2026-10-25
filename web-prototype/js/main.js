@@ -173,19 +173,42 @@
     if (e.type === 'sustain' || e.type === 'panic') pedal.classList.toggle('on', router.sustain);
   });
 
-  // --- computer keyboard (desktop testing) -----------------------------------
+  // --- computer keyboard -------------------------------------------------------
 
   const KEYMAP = 'awsedftgyhujkolp;';
   let baseNote = 60;
   const heldKeys = new Map(); // KeyboardEvent.code -> note
   const isFormField = t => t instanceof HTMLInputElement || t instanceof HTMLSelectElement;
 
+  // Letters drawn on the piano keys in keyboard mode, and the "⌨ Keys" help card.
+  function updateKeyLabels() {
+    router.keyLabels = new Map([...KEYMAP].map((ch, i) => [baseNote + i, ch === ';' ? ';' : ch.toUpperCase()]));
+    redrawAll();
+  }
+  if (window.CosmiqInput) {
+    CosmiqInput.keys.help('Piano keys', [
+      ['A S D F G H J K L', 'White keys (C D E F G A B C D)'],
+      ['W E T Y U O P', 'Black keys'],
+      ['Z X', 'Octave down / up'],
+      ['Space', 'Hold = sustain pedal'],
+      ['Tab Enter', 'Use the buttons (Play song, Learn …)'],
+    ], { corner: 'top-right' });
+    CosmiqInput.onChange(redrawAll);
+  }
+  updateKeyLabels();
+
   document.addEventListener('keydown', e => {
     if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || isFormField(e.target)) return;
-    if (e.code === 'Space') { e.preventDefault(); router.setSustain(true, 'computer'); return; }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (e.target instanceof HTMLButtonElement) e.target.blur(); // Space is the pedal, not "press this button"
+      router.setSustain(true, 'computer');
+      return;
+    }
     const k = e.key.toLowerCase();
     if (k === 'z' || k === 'x') {
       baseNote = Math.max(24, Math.min(96, baseNote + (k === 'z' ? -12 : 12)));
+      updateKeyLabels();
       return;
     }
     const i = KEYMAP.indexOf(k);

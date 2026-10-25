@@ -166,8 +166,10 @@
     const m = game.maze;
     const hud = document.createElement('div');
     hud.className = 'maze-hud';
-    hud.innerHTML = '<span class="who"></span><span class="time">0:00.0</span><span class="info"></span><span class="spacer"></span><button class="ifpd-btn">💡 Show path</button>';
+    hud.innerHTML = '<span class="who"></span><span class="keys"></span><span class="time">0:00.0</span><span class="info"></span><span class="spacer"></span><button class="ifpd-btn">💡 Show path</button>';
     const who = hud.querySelector('.who');
+    const caps = game.mode === 'solo' ? ['←', '↑', '→', '↓'] : i === 0 ? ['W', 'A', 'S', 'D'] : ['←', '↑', '→', '↓'];
+    for (const c of caps) hud.querySelector('.keys').append(Object.assign(document.createElement('kbd'), { textContent: c }));
     if (game.mode === 'race') {
       who.textContent = 'Player ' + (i + 1);
       who.style.background = PLAYER_COLORS[i];
@@ -178,6 +180,7 @@
     const btn = hud.querySelector('button');
     btn.innerHTML = '💡 <span class="long"></span><span class="short">Path</span>';
     btn.querySelector('.long').textContent = game.mode === 'race' ? `Path (freeze ${RACE_FREEZE}s)` : `Show path (+${HINT_PENALTY}s)`;
+    btn.append(Object.assign(document.createElement('kbd'), { textContent: HINT_KEYS[game.mode][i].cap }));
     btn.addEventListener('click', () => showHint(i));
     stage.append(hud);
     return {
@@ -186,7 +189,7 @@
       holder: null, offX: 0, offY: 0, trail: [],
       finished: false, time: 0, penalty: 0, frozen: 0,
       hintPath: null, hintT: 0, ringT: 0, contact: false, lastBump: 0, hints: 0,
-      lastShown: '',
+      lastShown: '', kvx: 0, kvy: 0, kbT: 0,
     };
   }
 
@@ -226,6 +229,7 @@
     staticDirty = true;
     layout();
     updateHud(true);
+    keyHelp();
     IFPD.sfx.play('whoosh');
     IFPD.sfx.play('tick', { volume: 3, pitch: 0.5 });
   }
@@ -390,6 +394,117 @@
     }
   }
 
+  // ---------------------------------------------------------------- keyboard
+  // Solo: arrows or W A S D. Race: player 1 (left) W A S D, player 2 (right) arrows. The ball rolls with
+  // acceleration up to a top speed and moves in the same collision-checked sub-steps as dragging.
+  const MOVE_KEYS = { // code -> [race player, dx, dy]
+    KeyW: [0, 0, -1], KeyA: [0, -1, 0], KeyS: [0, 0, 1], KeyD: [0, 1, 0],
+    ArrowUp: [1, 0, -1], ArrowLeft: [1, -1, 0], ArrowDown: [1, 0, 1], ArrowRight: [1, 1, 0],
+  };
+  const HINT_KEYS = {
+    solo: [{ code: 'KeyH', cap: 'H' }],
+    race: [{ code: 'KeyE', cap: 'E' }, { code: 'Slash', cap: '/' }],
+  };
+  const held = new Set();
+
+  function keyDir(i) {
+    let x = 0, y = 0;
+    for (const code of held) {
+      const k = MOVE_KEYS[code];
+      if (game.mode === 'race' && k[0] !== i) continue;
+      x += k[1]; y += k[2];
+    }
+    return [Math.sign(x), Math.sign(y)];
+  }
+
+  const approach = (v, target, step) => v < target ? Math.min(target, v + step) : Math.max(target, v - step);
+
+  function keyMove(pl, r, dt) {
+    const [ix, iy] = keyDir(pl.i);
+    if (!ix && !iy && !pl.kvx && !pl.kvy) return;
+    const vmax = util.clamp(620 / r.cell, 3.2, 7); // cells per second (about 620 px/s on screen)
+    let tx = 0, ty = 0;
+    if (ix || iy) {
+      const l = Math.hypot(ix, iy);
+      tx = ix / l * vmax; ty = iy / l * vmax;
+      // lane assist: with one direction held, ease into the middle of the corridor so openings are easy to hit
+      if (!iy) ty = util.clamp((Math.round(pl.y - 0.5) + 0.5 - pl.y) * 10, -vmax * 0.6, vmax * 0.6);
+      if (!ix) tx = util.clamp((Math.round(pl.x - 0.5) + 0.5 - pl.x) * 10, -vmax * 0.6, vmax * 0.6);
+      pl.kbT = 0.6;
+    }
+    const step = (ix || iy ? vmax / 0.16 : vmax / 0.07) * dt; // speed up in ~0.16 s, stop in ~0.07 s
+    pl.kvx = approach(pl.kvx, tx, step);
+    pl.kvy = approach(pl.kvy, ty, step);
+    const dx = pl.kvx * dt, dy = pl.kvy * dt, dist = Math.hypot(dx, dy);
+    if (dist < 1e-7) return;
+    const p = { x: pl.x, y: pl.y };
+    const steps = Math.max(1, Math.ceil(dist / SUB));
+    let hit = false;
+    for (let s = 0; s < steps; s++) {
+      p.x += dx / steps;
+      p.y += dy / steps;
+      if (collide(game.maze, p)) hit = true;
+    }
+    if (hit) {
+      // keep only the motion the walls allowed: the ball slides along a wall instead of pushing into it
+      const sp = Math.hypot(pl.kvx, pl.kvy);
+      pl.kvx = (p.x - pl.x) / dt; pl.kvy = (p.y - pl.y) / dt;
+      const ns = Math.hypot(pl.kvx, pl.kvy);
+      if (ns > sp && ns > 0) { pl.kvx *= sp / ns; pl.kvy *= sp / ns; }
+      const speed = dist / dt;
+      if (!pl.contact && speed > 1.5) {
+        const now = performance.now();
+        if (now - pl.lastBump > 110) {
+          pl.lastBump = now;
+          IFPD.sfx.play('wall', { volume: util.clamp(speed / 25, 0.25, 1), pitch: util.rand(0.9, 1.15), pan: panOf(pl) });
+        }
+      }
+    }
+    pl.contact = hit;
+    pl.x = p.x; pl.y = p.y;
+  }
+
+  let helpId = '';
+  function keyHelp() {
+    if (!window.CosmiqInput) return;
+    let id, rows;
+    if (setupEl || game.phase === 'setup') {
+      id = 'menu';
+      rows = [['← → ↑ ↓', 'Choose'], ['Tab', 'Next button'], ['Enter', 'Select']];
+    } else if (game.mode === 'race') {
+      id = 'race';
+      rows = [['W A S D', 'Player 1 (left maze)'], ['E', `Player 1: show path (frozen ${RACE_FREEZE} s)`],
+        ['← ↑ → ↓', 'Player 2 (right maze)'], ['/', `Player 2: show path (frozen ${RACE_FREEZE} s)`]];
+    } else {
+      id = 'solo';
+      rows = [['← ↑ → ↓', 'Roll the ball'], ['W A S D', 'Roll the ball (same)'], ['H', `Show the path (+${HINT_PENALTY} s)`]];
+    }
+    if (id === helpId) return;
+    helpId = id;
+    CosmiqInput.keys.help('Maze Runner', rows);
+  }
+
+  if (window.CosmiqInput) {
+    CosmiqInput.onChange(() => { helpId = ''; keyHelp(); });
+    CosmiqInput.keys.on(e => {
+      const down = e.type === 'keydown';
+      if (MOVE_KEYS[e.code]) {
+        if (!down) { held.delete(e.code); return; }
+        if (setupEl || IFPD.overlay.visible || game.phase === 'setup') return;
+        e.preventDefault();
+        held.add(e.code);
+        return;
+      }
+      if (!down || e.repeat || setupEl || IFPD.overlay.visible) return;
+      const keys = HINT_KEYS[game.mode] || [];
+      const i = keys.findIndex(k => k.code === e.code);
+      if (i < 0 || !game.players[i]) return;
+      e.preventDefault();
+      showHint(i);
+    });
+    window.addEventListener('blur', () => held.clear());
+  }
+
   function update(dt) {
     if (setupEl) return; // paused while the settings card is open
     if (game.phase === 'countdown') {
@@ -410,11 +525,12 @@
     for (const pl of game.players) {
       if (pl.ringT > 0) pl.ringT -= dt;
       if (pl.hintT > 0) pl.hintT -= dt;
+      if (pl.kbT > 0) pl.kbT -= dt;
       if (pl.finished) continue;
       pl.time += dt;
       const r = game.regions[pl.i];
-      if (pl.frozen > 0) { pl.frozen -= dt; continue; }
-      if (pl.holder != null && r) moveBall(pl, r, dt);
+      if (pl.frozen > 0) { pl.frozen -= dt; pl.kvx = pl.kvy = 0; continue; }
+      if (pl.holder != null && r) { moveBall(pl, r, dt); pl.kvx = pl.kvy = 0; } else if (r) keyMove(pl, r, dt);
       if (Math.hypot(pl.x - (m.goal.x + 0.5), pl.y - (m.goal.y + 0.5)) < 0.3) arrived.push(pl);
     }
     if (arrived.length) finish(arrived);
@@ -753,7 +869,7 @@ Best: ${fmt(prev / 1000)}` : ''),
       drawPath(ctx, r, pl, t);
       const bx = r.ox + pl.x * r.cell, by = r.oy + pl.y * r.cell, rad = BALL_R * r.cell;
       // hint ring: "put your finger on the ball"
-      const showRing = game.phase === 'play' && !pl.finished && pl.holder == null && pl.frozen <= 0;
+      const showRing = game.phase === 'play' && !pl.finished && pl.holder == null && pl.frozen <= 0 && !(pl.kbT > 0);
       if (showRing) {
         const ph = (t * 1.2) % 1;
         const strong = pl.ringT > 0 ? 1 : 0.45;
@@ -808,7 +924,7 @@ Best: ${fmt(prev / 1000)}` : ''),
 
   // ---------------------------------------------------------------- setup screen
   let setupEl = null;
-  function closeSetup() { if (setupEl) { setupEl.remove(); setupEl = null; } }
+  function closeSetup() { if (setupEl) { setupEl.remove(); setupEl = null; keyHelp(); } }
 
   function showSetup() {
     IFPD.overlay.hide();
@@ -855,6 +971,8 @@ Best: ${fmt(prev / 1000)}` : ''),
     });
     stage.append(o);
     setupEl = o;
+    held.clear();
+    keyHelp();
   }
 
   // ---------------------------------------------------------------- boot

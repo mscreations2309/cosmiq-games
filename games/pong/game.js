@@ -14,6 +14,7 @@
   const BAND = [[-440, -110], [TL + 110, TL + 440]];
   const YMIN = -210, YMAX = TW + 210;
   const VIEW = { x0: -560, x1: TL + 560, y0: -250, y1: TW + 250 };
+  const KEY_SPEED = 2400, KEY_ACCEL = 15000, KEY_BRAKE = 18000; // keyboard paddle motion
   const COLORS = ['#2d7ff9', '#f2542d'];
   const FONT = '"Segoe UI", Roboto, system-ui, sans-serif';
   const AI_LEVELS = {
@@ -38,7 +39,7 @@
   }
   function mkPaddle(side) {
     const x = side === 0 ? -260 : TL + 260;
-    return { side, x, y: TW / 2, vx: 0, vy: 0, tx: x, ty: TW / 2, owner: null, fx: 0, fy: 0, swing: 0 };
+    return { side, x, y: TW / 2, vx: 0, vy: 0, tx: x, ty: TW / 2, owner: null, fx: 0, fy: 0, swing: 0, keys: false, kvx: 0, kvy: 0 };
   }
   const dirOf = s => (s === 0 ? 1 : -1);
 
@@ -75,21 +76,76 @@
       if (side === 1 && S.ai) return false;
       const pd = S.paddles[side];
       if (pd.owner !== null) return false;
-      pd.owner = p.id; pd.fx = p.x; pd.fy = p.y; pd.heldT = 0;
+      pd.owner = p.id; pd.fx = p.x; pd.fy = p.y; pd.heldT = 0; pd.keys = false;
       p.data.side = side;
       return true;
     },
-    move(p) { const pd = S.paddles[p.data.side]; if (pd && pd.owner === p.id) { pd.fx = p.x; pd.fy = p.y; } },
+    move(p) { const pd = S.paddles[p.data.side]; if (pd && pd.owner === p.id) { pd.fx = p.x; pd.fy = p.y; pd.keys = false; } },
     up(p) { const pd = S.paddles[p.data.side]; if (pd && pd.owner === p.id) pd.owner = null; },
   });
+
+  // ---- keyboard: P1 W/S up-down, A/D back-forward; P2 arrows (← = toward the net). Last input (key or finger) wins. ----
+  const KEY_DIRS = { // code -> [player, dx, dy] in screen directions
+    KeyW: [0, 0, -1], KeyS: [0, 0, 1], KeyA: [0, -1, 0], KeyD: [0, 1, 0],
+    ArrowUp: [1, 0, -1], ArrowDown: [1, 0, 1], ArrowLeft: [1, -1, 0], ArrowRight: [1, 1, 0],
+  };
+  const SERVE_KEYS = [['KeyD'], ['ArrowLeft']];
+  const held = new Set();
+  const keySide = code => (S.ai ? 0 : KEY_DIRS[code][0]); // vs computer the human may use either set
+  const playing = () => S.phase === 'serve' || S.phase === 'rally' || S.phase === 'dead';
+  const humanServe = () => S.phase === 'serve' && !(S.ai && S.server === 1);
+  const serveKey = side => (S.ai ? 'D' : side === 0 ? 'D' : '←');
+  CosmiqInput.keys.on(e => {
+    if (e.type === 'keyup') { held.delete(e.code); return; }
+    if (!playing() || IFPD.overlay.visible) return;
+    if (e.code === 'Escape' && !e.repeat) { showMenu(); e.preventDefault(); return; }
+    if (e.code === 'Space') {
+      e.preventDefault();
+      if (!e.repeat && humanServe()) serve(S.server);
+      return;
+    }
+    if (!KEY_DIRS[e.code]) return;
+    e.preventDefault();
+    const side = keySide(e.code);
+    held.add(e.code);
+    S.paddles[side].keys = true;
+    // Serve: the forward key of the serving player (D, or ← for player 2; vs computer also →).
+    const fwd = S.ai ? e.code === 'KeyD' || e.code === 'ArrowRight' : SERVE_KEYS[side].includes(e.code);
+    if (!e.repeat && fwd && humanServe() && S.server === side) serve(side);
+  });
+  window.addEventListener('blur', () => held.clear());
+
+  function keyDir(side) {
+    let dx = 0, dy = 0;
+    for (const c of held) {
+      if (keySide(c) !== side) continue;
+      dx += KEY_DIRS[c][1]; dy += KEY_DIRS[c][2];
+    }
+    const d = Math.hypot(dx, dy);
+    return d ? { x: dx / d, y: dy / d } : null;
+  }
+
+  function showKeyHelp() {
+    const h = CosmiqInput.keys.help;
+    if (!playing()) h('Table Tennis', [['Tab ← →', 'Choose'], ['Enter', 'Select']]);
+    else if (S.ai) {
+      h('Table Tennis', [['W S', 'Paddle up / down'], ['A D', 'Back / toward the net'], ['↑ ↓ ← →', 'Arrow keys work too'],
+        ['D Space', 'Serve'], ['Esc', 'Modes menu']]);
+    } else {
+      h('Table Tennis', [['W S', 'Blue up / down'], ['A D', 'Blue back / toward the net'], ['D', 'Blue serves'],
+        ['↑ ↓', 'Orange up / down'], ['→ ←', 'Orange back / toward the net'], ['←', 'Orange serves'],
+        ['Space', 'Serve (whoever serves)'], ['Esc', 'Modes menu']]);
+    }
+  }
 
   // ---- flow ----
   function showMenu() {
     S.phase = 'menu';
     releaseAll();
+    showKeyHelp();
     IFPD.overlay.show({
       title: 'Table Tennis',
-      text: 'Move your paddle with one finger in your half.\nFlick toward the table to serve. Games to 11, win by 2.',
+      text: 'Move your paddle with one finger in your half.\nFlick toward the table to serve. Games to 11, win by 2.\nKeyboard: W A S D and arrow keys.',
       buttons: [
         { label: '2 Players', kind: 'good', onClick: () => chooseLength(null) },
         { label: 'vs Computer · Easy', kind: 'primary', onClick: () => chooseLength('easy') },
@@ -109,7 +165,10 @@
       ],
     });
   }
-  function releaseAll() { for (const p of S.paddles) p.owner = null; }
+  function releaseAll() {
+    held.clear();
+    for (const p of S.paddles) { p.owner = null; p.keys = false; p.kvx = p.kvy = 0; }
+  }
 
   function startMatch(aiLevel, bestOf) {
     IFPD.overlay.hide();
@@ -118,7 +177,9 @@
     S.games = [0, 0];
     S.paddles = [mkPaddle(0), mkPaddle(1)];
     S.firstServer = Math.random() < 0.5 ? 0 : 1;
+    held.clear();
     startGame(S.firstServer);
+    showKeyHelp();
     IFPD.sfx.play('whoosh', { volume: 0.5 });
   }
   function startGame(first) {
@@ -190,6 +251,7 @@
   function finish(w) {
     S.phase = 'over';
     releaseAll();
+    showKeyHelp();
     const names = playerNames();
     const human = !S.ai || w === 0;
     IFPD.sfx.play(human ? 'win' : 'lose');
@@ -312,6 +374,7 @@
 
     for (const p of S.paddles) {
       if (p.side === 1 && S.ai) continue;
+      if (p.keys) continue;
       if (p.owner !== null) {
         p.heldT = (p.heldT || 0) + dt;
         const w = toWorld(p.fx, p.fy);
@@ -386,6 +449,18 @@
       const a = Math.hypot(ax, ay), am = lv.accel * h;
       if (a > am) { ax *= am / a; ay *= am / a; }
       p.x += (p.vx + ax) * h; p.y += (p.vy + ay) * h;
+    } else if (p.keys) {
+      // Keyboard: accelerate toward the held direction, brake on release. The real paddle velocity
+      // gives spin (up/down) and pace (toward the net) exactly like a finger flick.
+      const dir = keyDir(p.side);
+      const tvx = dir ? dir.x * KEY_SPEED : 0, tvy = dir ? dir.y * KEY_SPEED : 0;
+      let ax = tvx - p.kvx, ay = tvy - p.kvy;
+      const a = Math.hypot(ax, ay), am = (dir ? KEY_ACCEL : KEY_BRAKE) * h;
+      if (a > am) { ax *= am / a; ay *= am / a; }
+      p.kvx += ax; p.kvy += ay;
+      p.x += p.kvx * h; p.y += p.kvy * h;
+      if (p.x < BAND[p.side][0] || p.x > BAND[p.side][1]) p.kvx = 0;
+      if (p.y < YMIN || p.y > YMAX) p.kvy = 0;
     } else if (p.owner !== null) {
       const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
       if (d > 0.01) { const st = Math.min(d, Math.min(9000, d / 0.02) * h); p.x += dx / d * st; p.y += dy / d * st; }
@@ -548,7 +623,7 @@
     g.fillStyle = 'rgba(255,255,255,0.22)';
     g.beginPath(); g.ellipse(dir * 6 - 14, -55, 16, 40, -0.2, 0, Math.PI * 2); g.fill();
     g.restore();
-    if (p.owner !== null) {
+    if (p.owner !== null || (p.keys && (p.kvx || p.kvy))) {
       g.strokeStyle = 'rgba(255,255,255,0.5)'; g.lineWidth = 6;
       g.beginPath(); g.ellipse(p.x, p.y, 90, 160, 0, 0, Math.PI * 2); g.stroke();
     }
@@ -620,7 +695,8 @@
         g.font = `600 ${Math.round(h * 0.2)}px ${FONT}`;
         g.fillStyle = '#ffd9a8';
         g.textAlign = 'center';
-        g.fillText('SERVE', bx, cy + h * 0.33);
+        const human = !(S.ai && s === 1);
+        g.fillText(CosmiqInput.mode === 'keyboard' && human ? `SERVE: ${serveKey(s)}` : 'SERVE', bx, cy + h * 0.33);
       }
     }
     g.textAlign = 'center';
@@ -651,7 +727,9 @@
       g.globalAlpha = 0.75 + 0.25 * Math.sin(S.time * 5);
       g.fillStyle = '#ffffff';
       g.font = `700 92px ${FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
-      g.fillText(s === 0 ? 'Flick right to serve  ➜' : '⬅  Flick left to serve', x, TW * 0.25);
+      const kb = CosmiqInput.mode === 'keyboard';
+      g.fillText(kb ? (s === 0 ? `Press ${S.ai ? 'D or →' : 'D'} to serve  ➜` : '⬅  Press ← to serve')
+        : (s === 0 ? 'Flick right to serve  ➜' : '⬅  Flick left to serve'), x, TW * 0.25);
       g.font = `600 60px ${FONT}`;
       g.fillText(`auto-serve in ${Math.max(0, Math.ceil(6 - S.serveT))}`, x, TW * 0.25 + 95);
       g.globalAlpha = 1;

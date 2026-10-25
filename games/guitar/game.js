@@ -358,11 +358,14 @@
 
   const padsEl = document.getElementById('pads');
   const padEls = [];
+  const PAD_KEYS = { '': 'P', C: 'Q', G: 'W', D: 'E', Am: 'R', Em: 'T', E: 'Y', A: 'U', F: 'I', Dm: 'O' };
   for (const name of ['', ...PAD_ORDER]) {
     const b = document.createElement('button');
     b.className = 'pad' + (name ? '' : ' open');
     b.dataset.chord = name;
-    b.innerHTML = name ? `${name}<small>${CHORD_LABEL[name]}</small>` : 'Open<small>no chord</small>';
+    b.tabIndex = -1; // played with their letter keys, not Tab
+    b.innerHTML = (name ? `${name}<small>${CHORD_LABEL[name]}</small>` : 'Open<small>no chord</small>') +
+      `<kbd>${PAD_KEYS[name]}</kbd>`;
     b.addEventListener('pointerdown', e => {
       e.preventDefault();
       audio.resume();
@@ -373,6 +376,41 @@
     padEls.push(b);
   }
   selectChord(null);
+
+  // --- keyboard ------------------------------------------------------------------------------
+
+  const KEY_TO_CHORD = {};
+  for (const [chord, letter] of Object.entries(PAD_KEYS)) KEY_TO_CHORD['Key' + letter] = chord;
+
+  CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown' || e.repeat) return;
+    if (e.code in KEY_TO_CHORD) {
+      e.preventDefault();
+      audio.resume();
+      const name = KEY_TO_CHORD[e.code];
+      selectChord(name || null);
+      if (S.padStrum) strum(true, 0.8);
+    } else if (e.code === 'Space' || e.code === 'ArrowDown' || e.code === 'ArrowUp') {
+      e.preventDefault();
+      if (document.activeElement instanceof HTMLButtonElement) document.activeElement.blur();
+      audio.resume();
+      strum(e.code !== 'ArrowUp', 0.8);
+    } else if (/^Digit[1-6]$/.test(e.code)) {
+      e.preventDefault();
+      audio.resume();
+      const s = Number(e.code.slice(5)) - 1;
+      pluck(s, 0.75);
+      ripple(fretCenter(Math.max(1, currentFret(s))), stringY(s, fretCenter(Math.max(1, currentFret(s)))));
+    }
+  });
+  CosmiqInput.keys.help('Guitar keys', [
+    ['Q W E R T Y U I O', 'Chords C G D Am Em E A F Dm'],
+    ['P', 'Open strings (no chord)'],
+    ['Space ↓', 'Strum down'],
+    ['↑', 'Strum up'],
+    ['1 2 3 4 5 6', 'Pluck one string (low E → high e)'],
+    ['Tab Enter', 'Song, Play, Learn, Stop buttons'],
+  ], { corner: 'top-right' });
 
   // --- songs (demo + learn) --------------------------------------------------------------------
 

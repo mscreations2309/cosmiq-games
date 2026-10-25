@@ -200,6 +200,7 @@
       q: null, balloons: [], shreds: [], ropes: [], popups: [],
       score: 0, streak: 0, bestStreak: 0, correct: 0, wrong: 0,
       spawnT: 0, pending: [], flash: 0, flashColor: '#3ddc84', shake: 0, qAnim: 0, recentWrong: [],
+      typed: '', note: null,     // keyboard: digits typed so far; gentle feedback { text, age }
     };
   }
 
@@ -238,6 +239,7 @@
     for (const f of fields) newQuestion(f, true);
     IFPD.sfx.play('whoosh');
     loop.resume();
+    showKeyHelp();
   }
 
   function restart() {
@@ -317,6 +319,7 @@
     f.q = makeQuestion(level, f.q && f.q.text);
     f.qAnim = 1;
     f.recentWrong = [];
+    f.typed = '';
     // everything still on screen drifts away; a fresh bunch rushes in
     for (const b of f.balloons) if (b.state === 'float') { b.state = 'leaving'; b.t = 0; }
     const n = targetCount(f);
@@ -476,6 +479,7 @@
       stepRope(r.pts, 0, 0, dt, true);
     }
     for (let i = f.popups.length - 1; i >= 0; i--) if ((f.popups[i].age += dt) > f.popups[i].life) f.popups.splice(i, 1);
+    if (f.note && (f.note.age += dt) > 1.8) f.note = null;
   }
 
   function update(dt) {
@@ -544,6 +548,71 @@
       IFPD.sfx.play('tap', { volume: 0.4, pan: panOf(f, x) });
       return false;
     },
+  });
+
+  // Keyboard: type the answer, then pop the balloon showing it (same scoring as tapping).
+  //   1 player: number row or numpad, Backspace deletes, Enter / Space pops.
+  //   2 teams:  Blue (left) = number row, Backspace, Space · Orange (right) = numpad, numpad . or −,
+  //             numpad Enter (no numpad: Orange taps / clicks its balloons).
+  const MAX_DIGITS = 3;
+  const kbMode = () => !!window.CosmiqInput && CosmiqInput.mode === 'keyboard';
+
+  function showKeyHelp() {
+    if (!window.CosmiqInput) return;
+    if (state === 'menu') CosmiqInput.keys.help('Balloon Pop Maths', [['Tab ← →', 'Choose'], ['Enter', 'Select / Start']]);
+    else if (!teams) {
+      CosmiqInput.keys.help('Balloon Pop Maths', [['0 – 9', 'Type the answer (numpad too)'], ['Backspace', 'Delete a digit'],
+        ['Enter Space', 'Pop the balloon with that number']]);
+    } else {
+      CosmiqInput.keys.help('Balloon Pop Maths · 2 teams', [['0 – 9', 'Blue (left): number row'], ['Backspace', 'Blue: delete'],
+        ['Space', 'Blue: pop'], ['Numpad 0–9', 'Orange (right): numpad'], ['. −', 'Orange: delete (numpad keys)'],
+        ['Numpad Enter', 'Orange: pop'], ['Mouse', 'No numpad? Orange clicks its balloons']]);
+    }
+  }
+
+  function onScreen(b) { return b.y - BRY * b.scale < 1000 && b.y + BRY * b.scale > 0; }
+
+  function typeDigit(f, d) {
+    if (f.typed.length >= MAX_DIGITS) { IFPD.sfx.play('tick', { volume: 0.6 }); return; }
+    f.typed = f.typed === '0' ? String(d) : f.typed + d;
+    f.note = null;
+    IFPD.sfx.play('tap', { volume: 0.35, pitch: 1.1 + f.typed.length * 0.08, pan: panOf(f, f.fw / 2) });
+  }
+
+  function deleteDigit(f) {
+    if (!f.typed) return;
+    f.typed = f.typed.slice(0, -1);
+    IFPD.sfx.play('tick', { volume: 0.5, pan: panOf(f, f.fw / 2) });
+  }
+
+  function submit(f) {
+    if (!f.typed) { f.note = { text: 'Type a number first', age: 0 }; IFPD.sfx.play('tick', { volume: 0.6 }); return; }
+    const n = Number(f.typed);
+    f.typed = '';
+    let hit = null;
+    for (const b of f.balloons) if (interactive(b) && b.value === n && onScreen(b) && (!hit || b.y > hit.y)) hit = b;
+    if (hit) { f.note = null; popBalloon(f, hit); return; }
+    f.note = { text: `No balloon shows ${n} — try again`, age: 0 };   // gentle: no penalty
+    IFPD.sfx.play('tick', { volume: 0.7, pitch: 0.8, pan: panOf(f, f.fw / 2) });
+  }
+
+  if (window.CosmiqInput) CosmiqInput.keys.on(e => {
+    if (e.type !== 'keydown' || state !== 'play' || menuEl || IFPD.overlay.visible || !fields.length) return;
+    const code = e.code, blue = fields[0], orange = teams ? fields[1] : fields[0];
+    const m = /^(Digit|Numpad)([0-9])$/.exec(code);
+    let f = null, act = null;
+    if (m) { f = m[1] === 'Numpad' ? orange : blue; act = 'digit'; }
+    else if (code === 'Backspace') { f = blue; act = 'del'; }
+    else if (code === 'NumpadDecimal' || code === 'NumpadSubtract') { f = orange; act = 'del'; }
+    else if (code === 'Space') { f = blue; act = 'go'; }
+    else if (code === 'NumpadEnter') { f = orange; act = 'go'; }
+    else if (code === 'Enter') { f = teams ? null : blue; act = 'go'; }
+    if (!act) return;
+    e.preventDefault();
+    if (!f) return;
+    if (act === 'digit') { if (!e.repeat) typeDigit(f, Number(m[2])); }
+    else if (act === 'del') deleteDigit(f);
+    else if (!e.repeat) submit(f);
   });
 
   // ---------------------------------------------------------------------------
@@ -667,15 +736,33 @@
     ctx.lineWidth = 6; ctx.strokeStyle = teams ? rgba(TEAMS[f.idx].color, 0.85) : 'rgba(47,128,237,0.35)'; ctx.stroke();
     if (f.q) {
       const k = 1 + f.qAnim * 0.25;
+      // the typed answer replaces the "?" (keyboard play)
+      const pre = f.q.text.slice(0, -1), ans = f.typed || '?';
       let size = 118;
       ctx.font = `900 ${size}px ${FONT}`;
-      const tw = ctx.measureText(f.q.text).width;
+      const tw = Math.max(ctx.measureText(f.q.text).width, ctx.measureText(pre + ans).width);
       if (tw > qw - 60) size *= (qw - 60) / tw;
+      ctx.font = `900 ${size}px ${FONT}`;
+      const wPre = ctx.measureText(pre).width, wAns = ctx.measureText(ans).width;
       ctx.save();
       ctx.translate(qx + qw / 2, qy + qh / 2 + 4);
       ctx.scale(k, k);
-      txt(ctx, f.q.text, 0, 0, size, '#1d2a3a', { stroke: null });
+      const x0 = -(wPre + wAns) / 2;
+      txt(ctx, pre, x0, 0, size, '#1d2a3a', { stroke: null, align: 'left' });
+      if (f.typed) {
+        const col = teams ? TEAMS[f.idx].color : '#2f80ed';
+        roundRect(ctx, x0 + wPre - size * 0.1, -size * 0.56, wAns + size * 0.2, size * 1.08, size * 0.18);
+        ctx.fillStyle = rgba(col, 0.14); ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = rgba(col, 0.8); ctx.stroke();
+        txt(ctx, ans, x0 + wPre, 0, size, col, { stroke: null, align: 'left' });
+      } else {
+        txt(ctx, ans, x0 + wPre, 0, size, '#1d2a3a', { stroke: null, align: 'left' });
+      }
       ctx.restore();
+      if (kbMode() && state === 'play') {
+        const hint = !teams ? 'Type the answer, then Enter' : f.idx === 0 ? 'Number keys, then Space' : 'Numpad, then numpad Enter';
+        txt(ctx, hint, qx + qw / 2, qy + qh - 15, 21, 'rgba(29,42,58,0.55)', { weight: 700, stroke: null });
+      }
     }
     // score box (left) and timer / streak (right)
     const box = (x, label, value, color) => {
@@ -694,6 +781,11 @@
     // streak flames under the question
     if (f.streak >= 2) {
       txt(ctx, `Streak ×${f.streak}`, fw / 2, qy + qh + 34, 40, '#fff3b0', { weight: 800, stroke: 'rgba(120,60,0,0.6)' });
+    }
+    if (f.note) {
+      ctx.globalAlpha = clamp((1.8 - f.note.age) / 0.4, 0, 1);
+      txt(ctx, f.note.text, fw / 2, qy + qh + (f.streak >= 2 ? 84 : 36), 36, '#ffffff', { weight: 800, stroke: 'rgba(16,40,72,0.7)', sw: 0.18 });
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -779,6 +871,7 @@
     IFPD.overlay.hide();
     hideMenu();
     fields = [];
+    showKeyHelp();
     const o = document.createElement('div');
     o.className = 'ifpd-overlay';
     o.innerHTML = `<div class="ifpd-card">

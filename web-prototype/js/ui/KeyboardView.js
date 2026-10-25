@@ -275,11 +275,41 @@
         this._label(ctx, note, x, br.w, bh, true, down);
       }
 
+      if (window.CosmiqInput && CosmiqInput.mode === 'keyboard') {
+        for (const [note, letter] of this.router.keyLabels) this._drawKeyCap(ctx, note, letter, x0);
+      }
+
       for (const note of this.router.guide) this._drawGuide(ctx, note, x0);
 
       // Felt strip above the keys.
       ctx.fillStyle = '#6b1d1d';
       ctx.fillRect(Math.max(0, x0), 0, Math.min(this.viewW, x0 + this.total) - Math.max(0, x0), Math.max(2, h * 0.012));
+    }
+
+    // Computer-keyboard letter on a piano key (keyboard input mode).
+    _drawKeyCap(ctx, note, letter, x0) {
+      if (note < P.MIN_NOTE || note > P.MAX_NOTE) return;
+      const black = isBlack(note);
+      let x, w, bottom;
+      if (black) {
+        const br = this._blackRect(note);
+        x = x0 + br.x; w = br.w; bottom = this.blackH - w * 0.25;
+      } else {
+        x = x0 + WHITE_INDEX.get(note) * this.w; w = this.w; bottom = this.keyH - this.w * 0.75;
+      }
+      if (x + w < 0 || x > this.viewW) return;
+      const s = Math.max(14, Math.min(w * 0.7, 30));
+      const cx = x + w / 2, cy = bottom - s / 2;
+      ctx.save();
+      ctx.fillStyle = black ? '#ffd27a' : '#2b2b33';
+      roundRectBottom(ctx, cx - s / 2, cy - s / 2, s, s, s * 0.2);
+      ctx.fill();
+      ctx.fillStyle = black ? '#1a1a1a' : '#ffd27a';
+      ctx.font = `bold ${Math.round(s * 0.62)}px system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(letter, cx, cy + 1);
+      ctx.restore();
     }
 
     // "Press this key next" marker used by the song teacher: green outline plus a dot with the note name.
