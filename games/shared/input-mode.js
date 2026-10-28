@@ -474,7 +474,7 @@
         font: 600 17px Poppins, "Segoe UI", system-ui, sans-serif; box-shadow: 0 6px 18px #ff7a6b55; touch-action: manipulation; }
       .ifpd-btn.cq-back-bar { color: #fff; background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a);
         border-color: #ffffff55; box-shadow: 0 6px 18px #ff7a6b55; font-weight: 700; }
-      .cq-back-float { position: fixed; left: 14px; top: 14px; z-index: 2147482000; display: inline-flex; align-items: center;
+      .cq-back-float { position: fixed; right: 14px; top: 14px; z-index: 2147482000; display: inline-flex; align-items: center;
         min-height: 48px; padding: 8px 20px; border-radius: 999px; border: 1px solid #ffffff55; color: #fff; text-decoration: none;
         background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a); box-shadow: 0 6px 18px #ff7a6b55;
         font: 700 18px Poppins, "Segoe UI", system-ui, sans-serif; touch-action: manipulation; }
