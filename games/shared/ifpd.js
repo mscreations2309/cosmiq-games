@@ -44,7 +44,7 @@
     const bar = document.createElement('header');
     bar.className = 'ifpd-bar';
     bar.innerHTML = `
-      <a class="ifpd-btn" href="${homeHref}" title="All games">⌂ Home</a>
+      <a class="ifpd-btn" data-act="home" href="${homeHref}" title="All games">⌂ Home</a>
       <h1></h1>
       <div class="ifpd-extra"></div>
       <button class="ifpd-btn" data-act="restart">↻ Restart</button>

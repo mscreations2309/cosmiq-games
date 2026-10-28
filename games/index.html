@@ -3,73 +3,118 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>COSMIQ Games</title>
+  <title>COSMIQ Game Zone</title>
   <link rel="stylesheet" href="shared/ifpd.css">
   <style>
     html, body { touch-action: pan-y; overflow: auto; }
-    body {
-      display: block;
-      background:
-        radial-gradient(ellipse at 50% -10%, #2d3a5c 0%, transparent 60%),
-        linear-gradient(#17171d, #0f0f13);
-      min-height: 100%;
-    }
-    .home-head {
-      display: flex;
-      align-items: center;
-      gap: 20px;
-      padding: 28px 48px 8px;
-    }
-    .home-head h1 { margin: 0; font-size: 44px; font-weight: 700; letter-spacing: 0.5px; }
-    .home-head p { margin: 4px 0 0; color: #a9a7b3; font-size: 20px; }
+    body { display: block; min-height: 100%; background: transparent; } /* lets the fixed backdrop show */
+
+    /* ── Animated arcade backdrop ─────────────────────────────────────── */
+    .bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none;
+      background: linear-gradient(#0e1019, var(--cq-bg) 45%, #1a1424); }
+    .orb { position: absolute; border-radius: 50%; filter: blur(30px); opacity: 0.9; }
+    .orb.a { width: 46vw; height: 46vw; left: -12vw; top: -14vw; background: radial-gradient(#ff7a6b55, transparent 65%); animation: drift-a 18s ease-in-out infinite alternate; }
+    .orb.b { width: 38vw; height: 38vw; right: -10vw; top: 6vw; background: radial-gradient(#8b5cf63d, transparent 65%); animation: drift-b 22s ease-in-out infinite alternate; }
+    .orb.c { width: 44vw; height: 44vw; left: 30vw; bottom: -22vw; background: radial-gradient(#ff6b4a33, transparent 65%); animation: drift-a 26s ease-in-out infinite alternate-reverse; }
+    @keyframes drift-a { to { transform: translate(8vw, 5vw) scale(1.1); } }
+    @keyframes drift-b { to { transform: translate(-7vw, 7vw) scale(0.92); } }
+    .floor { position: absolute; left: -50%; right: -50%; bottom: -10%; height: 55%;
+      background-image:
+        linear-gradient(#ff7a6b55 2px, transparent 2px),
+        linear-gradient(90deg, #ff7a6b40 2px, transparent 2px);
+      background-size: 90px 90px;
+      transform: perspective(500px) rotateX(62deg);
+      transform-origin: center top;
+      -webkit-mask-image: linear-gradient(transparent, #000 70%);
+      mask-image: linear-gradient(transparent, #000 70%);
+      animation: roll 3s linear infinite; opacity: 0.55; }
+    @keyframes roll { to { background-position: 0 90px, 0 0; } }
+    .glyph { position: absolute; bottom: -60px; width: var(--s); height: var(--s); opacity: 0.25;
+      border: 3px solid var(--c); animation: rise var(--t) linear infinite; animation-delay: var(--d); }
+    .glyph.ring { border-radius: 50%; }
+    .glyph.diamond { border-radius: 4px; }
+    .glyph.plus { border: none; }
+    .glyph.plus::before, .glyph.plus::after { content: ""; position: absolute; background: var(--c); border-radius: 3px; }
+    .glyph.plus::before { left: 0; right: 0; top: 40%; height: 20%; }
+    .glyph.plus::after { top: 0; bottom: 0; left: 40%; width: 20%; }
+    @keyframes rise { to { transform: translateY(-115vh) rotate(260deg); } }
+
+    /* ── Header ───────────────────────────────────────────────────────── */
+    .home-head { display: flex; align-items: center; gap: 24px; padding: 32px 48px 8px; animation: head-in 0.7s cubic-bezier(.2,1.2,.4,1) both; }
+    @keyframes head-in { from { opacity: 0; transform: translateY(-40px); } to { opacity: 1; transform: none; } }
+    .logo { position: relative; flex: none; width: 96px; height: 96px; display: grid; place-items: center; }
+    .logo::before { content: ""; position: absolute; inset: 0; border-radius: 50%;
+      background: conic-gradient(transparent, #ff9a8b, #ff7a6b, #ffb800, transparent);
+      -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+      mask: radial-gradient(farthest-side, transparent calc(100% - 7px), #000 calc(100% - 6px));
+      animation: spin 4s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .logo span { width: 76px; height: 76px; display: grid; place-items: center; border-radius: 50%;
+      background: var(--cq-coral-grad); box-shadow: 0 10px 30px #ff7a6b77; font-size: 38px; }
+    .logo span i { font-style: normal; animation: bob 1.4s ease-in-out infinite; }
+    @keyframes bob { 0%, 100% { transform: translateY(-3px) rotate(-8deg); } 50% { transform: translateY(3px) rotate(8deg); } }
+    .brand small { display: block; color: var(--cq-coral1); font-size: 17px; font-weight: 700; letter-spacing: 9px; }
+    .brand h1 { margin: -4px 0 0; font-size: 56px; line-height: 1.1; font-weight: 800; letter-spacing: 2px;
+      background: linear-gradient(100deg, var(--cq-text) 40%, var(--cq-coral1) 50%, var(--cq-text) 60%);
+      background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+      animation: shimmer 3.2s linear infinite; }
+    @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+    .brand p { margin: 2px 0 0; color: var(--cq-muted); font-size: 19px; }
     .home-head .ifpd-btn { margin-left: auto; }
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-      gap: 28px;
-      padding: 24px 48px 48px;
-    }
-    .tile {
-      position: relative;
-      display: flex;
-      flex-direction: column;
-      min-height: 230px;
-      padding: 22px 24px;
-      border-radius: 22px;
-      color: #fff;
-      text-decoration: none;
-      overflow: hidden;
-      background: linear-gradient(160deg, var(--c1), var(--c2));
-      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
-      transition: transform 0.12s ease, box-shadow 0.12s ease;
-      touch-action: manipulation;
-    }
-    .tile::after { /* glossy top light */
-      content: "";
-      position: absolute;
-      inset: 0 0 55% 0;
-      background: linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
-      pointer-events: none;
-    }
-    .tile:active { transform: scale(0.97); box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5); }
-    .tile .icon { font-size: 76px; line-height: 1; filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.35)); }
-    .tile h2 { margin: 14px 0 4px; font-size: 30px; }
-    .tile p { margin: 0; font-size: 17px; opacity: 0.92; }
-    .tile .tags { margin-top: auto; padding-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-    .tile .tags span {
-      padding: 4px 12px;
-      border-radius: 999px;
-      background: rgba(0, 0, 0, 0.28);
-      font-size: 14px;
-      font-weight: 600;
-    }
+
+    /* ── Game tiles ───────────────────────────────────────────────────── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 28px; padding: 26px 48px 56px; }
+    @keyframes tile-in { from { opacity: 0; transform: translateY(60px) scale(0.9); } to { opacity: 1; transform: none; } }
+    .tile { position: relative; display: flex; flex-direction: column; min-height: 330px; border-radius: 28px; overflow: hidden;
+      color: #fff; text-decoration: none; background: var(--cq-card);
+      border: 1.5px solid color-mix(in srgb, var(--c1) 70%, transparent);
+      box-shadow: 0 16px 34px #0008, 0 0 26px color-mix(in srgb, var(--c1) 30%, transparent);
+      animation: tile-in 0.6s cubic-bezier(.2,1.25,.4,1) both; animation-delay: calc(var(--i) * 55ms);
+      transition: transform 0.2s var(--cq-spring), box-shadow 0.2s ease; touch-action: manipulation; }
+    .tile:active { transform: scale(0.95) perspective(800px) rotateX(6deg); }
+    .art { position: relative; height: 170px; display: grid; place-items: center; overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #ffffff40, transparent 60%), linear-gradient(150deg, var(--c1), var(--c2)); }
+    .art::before { content: ""; position: absolute; inset: 0; opacity: 0.12;
+      background: repeating-linear-gradient(-45deg, #fff 0 8px, transparent 8px 34px); }
+    .art::after { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+      background: linear-gradient(90deg, transparent, #ffffff48, transparent);
+      animation: sweep 5s ease-in-out infinite; animation-delay: calc(var(--i) * 0.3s); }
+    @keyframes sweep { 0% { transform: translateX(-150%) skewX(-20deg); } 55%, 100% { transform: translateX(320%) skewX(-20deg); } }
+    .icon { position: relative; z-index: 1; font-size: 84px; line-height: 1; filter: drop-shadow(0 10px 12px #0006);
+      animation: float 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * -0.4s); transition: transform 0.25s var(--cq-spring); }
+    @keyframes float { 0%, 100% { translate: 0 -7px; rotate: -5deg; } 50% { translate: 0 7px; rotate: 5deg; } }
+    .tile:active .icon { transform: scale(1.18); }
+    .live { position: absolute; z-index: 2; top: 14px; left: 14px; display: flex; align-items: center; gap: 7px;
+      padding: 4px 11px; border-radius: 999px; background: #0006; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+    .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #2bd47d; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: 0.3; } }
+    .info { flex: 1; display: flex; flex-direction: column; padding: 16px 20px 18px; }
+    .info h2 { margin: 0; font-size: 26px; font-weight: 800; }
+    .info p { margin: 2px 0 0; font-size: 16px; color: var(--cq-muted); }
+    .foot { margin-top: auto; padding-top: 14px; display: flex; align-items: center; gap: 8px; }
+    .tags { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+    .tags span { padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600;
+      background: color-mix(in srgb, var(--c1) 30%, transparent); border: 1px solid color-mix(in srgb, var(--c1) 60%, transparent); }
+    .play { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 17px;
+      background: var(--cq-coral-grad); box-shadow: 0 6px 16px #ff7a6b66; transition: transform 0.2s var(--cq-spring); }
+    .tile:active .play { transform: scale(1.25); }
+
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
   </style>
 </head>
 <body>
+  <div class="bg" aria-hidden="true">
+    <div class="orb a"></div><div class="orb b"></div><div class="orb c"></div>
+    <div class="floor"></div>
+    <div id="glyphs"></div>
+  </div>
+
   <header class="home-head">
-    <div>
-      <h1>COSMIQ Classroom Games</h1>
-      <p>Tap a game to play. Many players can touch the screen at the same time.</p>
+    <div class="logo"><span><i>🎮</i></span></div>
+    <div class="brand">
+      <small>COSMIQ</small>
+      <h1>GAME ZONE</h1>
+      <p id="sub">Tap a game to play. Many players can touch the screen at the same time.</p>
     </div>
     <button class="ifpd-btn" id="fs">⛶ Fullscreen</button>
   </header>
@@ -80,6 +125,8 @@
   <script>
     (function () {
       'use strict';
+
+      /* The COSMIQ Android app reads this list (slug|href, icon, title, text, tags, c): keep its shape. */
       const GAMES = [
         { slug: 'air-hockey', icon: '🏒', title: 'Air Hockey', text: 'Fast table hockey, first to 7 goals.', tags: ['2 players', 'vs Computer'], c: ['#e04f5f', '#8e1f2c'] },
         { slug: 'pong', icon: '🏓', title: 'Table Tennis', text: 'Real table-tennis rules with spin.', tags: ['2 players', 'vs Computer'], c: ['#2f80ed', '#173f7a'] },
@@ -98,13 +145,15 @@
       ];
 
       const grid = document.getElementById('grid');
-      for (const g of GAMES) {
+      GAMES.forEach((g, i) => {
         const a = document.createElement('a');
         a.className = 'tile';
         a.href = g.href || g.slug + '/index.html';
         a.style.setProperty('--c1', g.c[0]);
         a.style.setProperty('--c2', g.c[1]);
-        a.innerHTML = '<div class="icon"></div><h2></h2><p></p><div class="tags"></div>';
+        a.style.setProperty('--i', i);
+        a.innerHTML = '<div class="art"><span class="live">ONLINE</span><div class="icon"></div></div>' +
+          '<div class="info"><h2></h2><p></p><div class="foot"><div class="tags"></div><span class="play">▶</span></div></div>';
         a.querySelector('.icon').textContent = g.icon;
         a.querySelector('h2').textContent = g.title;
         a.querySelector('p').textContent = g.text;
@@ -115,6 +164,23 @@
           tags.append(s);
         }
         grid.append(a);
+      });
+      document.getElementById('sub').textContent =
+        GAMES.length + ' games  ·  Tap a game to play. Many players can touch the screen at the same time.';
+
+      // Floating game symbols in the backdrop.
+      const kinds = ['ring', 'diamond', 'plus', 'ring'];
+      const colors = ['#ff7a6b', '#ff9a8b', '#22c7c7', '#8b5cf6', '#ffb800'];
+      const glyphs = document.getElementById('glyphs');
+      for (let i = 0; i < 18; i++) {
+        const el = document.createElement('span');
+        el.className = 'glyph ' + kinds[i % kinds.length];
+        el.style.left = (Math.random() * 100) + 'vw';
+        el.style.setProperty('--s', (16 + Math.random() * 30) + 'px');
+        el.style.setProperty('--c', colors[i % colors.length]);
+        el.style.setProperty('--t', (18 + Math.random() * 22) + 's');
+        el.style.setProperty('--d', (-Math.random() * 40) + 's');
+        glyphs.append(el);
       }
 
       document.getElementById('fs').addEventListener('click', () => {

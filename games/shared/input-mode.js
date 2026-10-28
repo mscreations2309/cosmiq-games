@@ -27,10 +27,23 @@
   const Input = { mode: null, base: BASE, onChange: fn => listeners.push(fn) };
   window.CosmiqInput = Input;
 
+  // Opened from COSMIQ Game Zone (the Android app): ?app=1 on the first page, kept for the session.
+  // The app is a touch panel with its own Back / Close, so pages skip the chooser and hide Home.
+  const IN_APP = (() => {
+    const flag = /[?&]app=1(&|$)/.test(location.search);
+    try {
+      if (flag) sessionStorage.setItem('cosmiq-in-app', '1');
+      return sessionStorage.getItem('cosmiq-in-app') === '1';
+    } catch (_) { return flag; }
+  })();
+  Input.inApp = IN_APP;
+  if (IN_APP) document.documentElement.classList.add('cq-in-app');
+
   injectStyles();
 
   // Camera input needs a secure page that can fetch files (the app, or a localhost server).
   function cameraBlocker() {
+    if (IN_APP) return 'Camera play is off inside the COSMIQ app.';
     if (location.protocol === 'file:') return 'Open the games with the COSMIQ Games app or "Start COSMIQ Games.bat" to use the camera.';
     if (!window.isSecureContext) return 'The camera only works in the COSMIQ Games app, or on this PC at http://localhost.';
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return 'This browser cannot use the camera.';
@@ -386,6 +399,7 @@
     try { saved = sessionStorage.getItem(KEY); } catch (_) { /* storage disabled */ }
     if (saved === 'camera' && cameraBlocker()) saved = null;
     if (saved === 'touch' || saved === 'camera' || saved === 'keyboard') apply(saved);
+    else if (IN_APP) choose('touch');
     else Input.showChooser();
   }
 
@@ -394,30 +408,42 @@
 
   function injectStyles() {
     const css = `
+      @keyframes cq-in { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes cq-rise { from { opacity: 0; transform: translateY(40px) scale(0.92); } to { opacity: 1; transform: none; } }
+      @keyframes cq-bob { 0%, 100% { transform: translateY(-6px) rotate(-4deg); } 50% { transform: translateY(6px) rotate(4deg); } }
+      @keyframes cq-shine { 0% { transform: translateX(-160%) skewX(-20deg); } 60%, 100% { transform: translateX(260%) skewX(-20deg); } }
       .cq-chooser { position: fixed; inset: 0; z-index: 2147483000; display: grid; place-items: center;
-        background: radial-gradient(ellipse at 50% 0%, #2d3a5c, #0d0d12 70%); color: #f1efe9;
-        font: 18px/1.4 "Segoe UI", system-ui, Roboto, sans-serif; touch-action: none; user-select: none; }
+        background: radial-gradient(ellipse at 15% 10%, #ff7a6b40, transparent 55%),
+                    radial-gradient(ellipse at 90% 90%, #8b5cf630, transparent 55%), #12151f; color: #fff4f1;
+        font: 18px/1.4 Poppins, "Segoe UI", system-ui, Roboto, sans-serif; touch-action: none; user-select: none;
+        animation: cq-in 0.35s ease both; }
       .cq-box { text-align: center; padding: 24px; }
-      .cq-box h1 { margin: 0 0 6px; font-size: 48px; }
-      .cq-sub { margin: 0 0 36px; color: #a9a7b3; font-size: 20px; }
+      .cq-box h1 { margin: 0 0 6px; font-size: 48px; font-weight: 800; letter-spacing: 0.5px;
+        background: linear-gradient(90deg, #fff4f1, #ff9a8b, #fff4f1); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .cq-sub { margin: 0 0 36px; color: #afa8b8; font-size: 20px; }
       .cq-options { display: flex; gap: 32px; justify-content: center; flex-wrap: wrap; }
-      .cq-opt { position: relative; width: 340px; min-height: 330px; padding: 28px; border-radius: 28px; border: 2px solid #ffffff22;
-        display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer; color: inherit;
-        font: inherit; background: linear-gradient(160deg, #3d8bfd, #1d4f9e);
-        box-shadow: 0 18px 40px #0008, inset 0 1px 0 #ffffff40; touch-action: manipulation; outline: none; }
-      .cq-opt[data-mode=camera] { background: linear-gradient(160deg, #36b37e, #17603f); }
-      .cq-opt[data-mode=keyboard] { background: linear-gradient(160deg, #9b59b6, #522a68); }
+      .cq-opt { position: relative; overflow: hidden; width: 340px; min-height: 330px; padding: 28px; border-radius: 30px;
+        border: 2px solid #ffffff30; display: flex; flex-direction: column; align-items: center; gap: 10px; cursor: pointer;
+        color: inherit; font: inherit; background: linear-gradient(160deg, #ff9a8b, #ff7a6b 45%, #e8553a);
+        box-shadow: 0 18px 40px #0008, 0 0 40px #ff7a6b40, inset 0 1px 0 #ffffff50; touch-action: manipulation; outline: none;
+        animation: cq-rise 0.55s cubic-bezier(.2,1.3,.4,1) both; transition: transform 0.18s cubic-bezier(.2,1.6,.4,1); }
+      .cq-opt::after { content: ''; position: absolute; top: 0; bottom: 0; width: 35%; left: 0;
+        background: linear-gradient(90deg, transparent, #ffffff40, transparent); animation: cq-shine 4.5s ease-in-out infinite; pointer-events: none; }
+      .cq-opt[data-mode=camera] { background: linear-gradient(160deg, #3fd6c6, #1a8f86); box-shadow: 0 18px 40px #0008, 0 0 40px #22c7c740, inset 0 1px 0 #ffffff50; animation-delay: 0.08s; }
+      .cq-opt[data-mode=keyboard] { background: linear-gradient(160deg, #a98bff, #5b34c9); box-shadow: 0 18px 40px #0008, 0 0 40px #8b5cf640, inset 0 1px 0 #ffffff50; animation-delay: 0.16s; }
       .cq-opt:focus-visible { box-shadow: 0 0 0 5px #ffd27a, 0 18px 40px #0008; }
-      .cq-opt:active { transform: scale(0.97); }
-      .cq-opt:disabled { filter: grayscale(0.8); opacity: 0.6; cursor: not-allowed; }
-      .cq-opt b { font-size: 40px; }
+      .cq-opt:active { transform: scale(0.95); }
+      .cq-opt:disabled { filter: grayscale(0.85); opacity: 0.5; cursor: not-allowed; }
+      .cq-opt b { font-size: 40px; font-weight: 800; }
       .cq-opt span { font-size: 19px; opacity: 0.95; }
       .cq-opt kbd { position: absolute; top: 14px; right: 16px; }
-      .cq-ico { font-size: 96px !important; line-height: 1; filter: drop-shadow(0 6px 10px #0006); }
+      .cq-ico { display: inline-block; font-size: 96px !important; line-height: 1; filter: drop-shadow(0 6px 10px #0006);
+        animation: cq-bob 2.4s ease-in-out infinite; }
       .cq-warn { font-size: 16px; font-style: normal; color: #ffe08a; }
       .cq-switch-float { position: fixed; right: 14px; bottom: 14px; z-index: 2147482000; min-height: 48px;
-        padding: 8px 18px; border-radius: 999px; border: 1px solid #ffffff33; background: #1c1c22e6; color: #fff;
-        font: 600 17px "Segoe UI", system-ui, sans-serif; box-shadow: 0 4px 14px #0007; touch-action: manipulation; }
+        padding: 8px 18px; border-radius: 999px; border: 1px solid #ffffff44; color: #fff;
+        background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a);
+        font: 600 17px Poppins, "Segoe UI", system-ui, sans-serif; box-shadow: 0 6px 18px #ff7a6b55; touch-action: manipulation; }
       .cq-chooser kbd, .cq-help-card kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; border-radius: 6px;
         border: 1px solid #ffffff55; border-bottom-width: 3px; background: #ffffff18; font: 700 15px "Segoe UI", sans-serif; text-align: center; }
       html[data-input-mode=keyboard] :focus-visible { outline: 4px solid #ffd27a !important; outline-offset: 3px; }
