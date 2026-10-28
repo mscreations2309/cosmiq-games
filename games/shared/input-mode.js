@@ -393,8 +393,36 @@
     if (cur.id != null && window.CosmiqPointer) { window.CosmiqPointer.up(cur.id, true); cur.id = null; }
   });
 
+  // Embedded in the COSMIQ app's WebView (it adds html.cq-embedded): "‹ Games" leaves the game;
+  // the app catches the cosmiqgamezone: link and returns to Game Zone.
+  function mountBack() {
+    if (!document.documentElement.classList.contains('cq-embedded')) return;
+    const back = document.createElement('a');
+    back.href = 'cosmiqgamezone://back';
+    back.textContent = '‹ Games';
+    back.title = 'Back to Game Zone';
+    const place = () => {
+      const bar = document.querySelector('.ifpd-bar');
+      if (!bar) return false;
+      back.className = 'ifpd-btn cq-back-bar';
+      bar.prepend(back);
+      return true;
+    };
+    if (place()) return;
+    const mo = new MutationObserver(() => { if (place()) mo.disconnect(); });
+    mo.observe(document.body, { childList: true, subtree: true });
+    setTimeout(() => {
+      mo.disconnect();
+      if (!back.isConnected) {
+        back.className = 'cq-back-float';
+        document.body.append(back);
+      }
+    }, 800);
+  }
+
   function init() {
     mountSwitch();
+    mountBack();
     let saved = null;
     try { saved = sessionStorage.getItem(KEY); } catch (_) { /* storage disabled */ }
     if (saved === 'camera' && cameraBlocker()) saved = null;
@@ -444,6 +472,13 @@
         padding: 8px 18px; border-radius: 999px; border: 1px solid #ffffff44; color: #fff;
         background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a);
         font: 600 17px Poppins, "Segoe UI", system-ui, sans-serif; box-shadow: 0 6px 18px #ff7a6b55; touch-action: manipulation; }
+      .ifpd-btn.cq-back-bar { color: #fff; background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a);
+        border-color: #ffffff55; box-shadow: 0 6px 18px #ff7a6b55; font-weight: 700; }
+      .cq-back-float { position: fixed; left: 14px; top: 14px; z-index: 2147482000; display: inline-flex; align-items: center;
+        min-height: 48px; padding: 8px 20px; border-radius: 999px; border: 1px solid #ffffff55; color: #fff; text-decoration: none;
+        background: linear-gradient(90deg, #ff9a8b, #ff7a6b, #ff6b4a); box-shadow: 0 6px 18px #ff7a6b55;
+        font: 700 18px Poppins, "Segoe UI", system-ui, sans-serif; touch-action: manipulation; }
+      .cq-back-float:active, .ifpd-btn.cq-back-bar:active { transform: scale(0.93); }
       .cq-chooser kbd, .cq-help-card kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; border-radius: 6px;
         border: 1px solid #ffffff55; border-bottom-width: 3px; background: #ffffff18; font: 700 15px "Segoe UI", sans-serif; text-align: center; }
       html[data-input-mode=keyboard] :focus-visible { outline: 4px solid #ffd27a !important; outline-offset: 3px; }
